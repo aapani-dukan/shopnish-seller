@@ -1,4 +1,39 @@
 {
-  "name": "ShopnishSeller",
-  "displayName": "ShopnishSeller"
+  "expo": {
+    "name": "Shopnish Seller",
+    "slug": "shopnish-seller",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#001B3A"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.shopnish.seller"
+    },
+    "android": {
+  "package": "com.shopnish.seller",
+  "googleServicesFile": "./google-services.json",
+  "adaptiveIcon": {
+    "foregroundImage": "./assets/adaptive-icon.png",
+    "backgroundColor": "#001B3A"
+  }
+},
+      
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+   "plugins": [
+  "expo-asset",
+  "@react-native-firebase/app",
+  "@react-native-firebase/auth"
+]
+  }
 }
