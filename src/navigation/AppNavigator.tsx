@@ -21,6 +21,7 @@ import OrderDetailsScreen from '../screens/Orders/OrderDetailsScreen';
 import AddProductScreen from '../screens/Inventory/AddProductScreen';
 import EditProductScreen from '../screens/Inventory/EditProductScreen';
 import SellerWalletScreen from '../screens/SellerWalletScreen';
+import BankDetailsScreen from '../screens/Auth/BankDetailsScreen';
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
@@ -100,6 +101,15 @@ export default function AppNavigator() {
     headerStyle: { backgroundColor: '#fff' },
     headerTitleStyle: { fontWeight: '800', color: '#001B3A' },
     headerShadowVisible: false, // क्लीन लुक के लिए
+  }} 
+/>
+                <Stack.Screen 
+  name="BankDetails" 
+  component={BankDetailsScreen} 
+  options={{ 
+    title: 'Bank Account Setup',
+    headerTitleStyle: { fontWeight: '900', color: '#000' },
+    headerShadowVisible: false,
   }} 
 />
                 <Stack.Screen 

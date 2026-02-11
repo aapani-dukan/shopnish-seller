@@ -30,7 +30,8 @@ type SellerFormData = z.infer<typeof sellerSchema>;
 export default function SellerOnboarding() {
   const { refreshUserStatus } = useAuth();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
-const [isLocating, setIsLocating] = React.useState(false);
+  const [isLocating, setIsLocating] = React.useState(false);
+
   const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm<SellerFormData>({
     resolver: zodResolver(sellerSchema),
     defaultValues: { 
@@ -46,12 +47,11 @@ const [isLocating, setIsLocating] = React.useState(false);
     }
   });
 
-  
- const detectLocation = async () => {
+  // 📍 Location Detection Logic
+  const detectLocation = async () => {
     try {
       setIsLocating(true);
       
-      // 1. परमिशन मांगें
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert("Permission Denied", "Shop की लोकेशन के लिए परमिशन ज़रूरी है।");
@@ -59,53 +59,78 @@ const [isLocating, setIsLocating] = React.useState(false);
         return;
       }
 
-      // 2. कोऑर्डिनेट्स लें
       let location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Highest,
       });
 
       const { latitude, longitude } = location.coords;
-      setValue('latitude', latitude);
-      setValue('longitude', longitude);
+      setValue('latitude', latitude, { shouldValidate: true });
+      setValue('longitude', longitude, { shouldValidate: true });
 
-      // 3. रिवर्स जियोकोडिंग (Coordinates से एड्रेस बनाना)
       let reverseGeocode = await Location.reverseGeocodeAsync({ latitude, longitude });
       
       if (reverseGeocode.length > 0) {
         const place = reverseGeocode[0];
-        // ऑटो-फिल फॉर्म फील्ड्स
-        const autoAddress = `${place.name || ''}, ${place.street || ''}, ${place.district || ''}`;
-        setValue('businessAddress', autoAddress);
-        setValue('city', place.city || place.subregion || '');
-        setValue('pincode', place.postalCode || '');
+        // क्लीन एड्रेस फॉर्मेटिंग
+        const autoAddress = [place.name, place.street, place.district, place.subregion]
+          .filter(Boolean)
+          .join(', ');
+
+        setValue('businessAddress', autoAddress, { shouldValidate: true });
+        setValue('city', place.city || place.subregion || '', { shouldValidate: true });
+        setValue('pincode', place.postalCode || '', { shouldValidate: true });
         
         Alert.alert("Location Detected", "Aapka address auto-fill kar diya gaya hai.");
       }
     } catch (error) {
+      console.error("Location Error:", error);
       Alert.alert("Error", "Location track nahi ho paayi. Kripya manually bharein.");
     } finally {
       setIsLocating(false);
     }
   };
 
+  // 🚀 Final Submission Logic (Updated for Backend Compatibility)
   const onSubmit = async (data: SellerFormData) => {
-    // 🛡️ सेफ्टी चेक: अगर अब भी Lat/Lng नहीं है
-    if (!data.latitude || !data.longitude) {
-      Alert.alert("Location Missing", "Kripya 'Use Current Location' बटन दबाएं या एड्रेस सही से लिखें।");
-      return;
-    }
+  setIsSubmitting(true);
+  try {
+    // बैकएंड की फाइल (apply.ts) के "const { ... } = req.body" से मैच किया गया पेलोड
+    const payload = {
+      businessName: data.businessName,
+      businessAddress: data.businessAddress,
+      businessPhone: data.businessPhone,
+      description: data.description || "",
+      city: data.city,
+      pincode: data.pincode,
+      bankAccountNumber: data.bankAccountNumber,
+      ifscCode: data.ifscCode,
+      deliveryRadius: data.deliveryRadius,
+      // 🚨 सबसे ज़रूरी: बैकएंड 'businessType' मांग रहा है जो आपके फॉर्म में नहीं था
+      // इसे अभी के लिए 'Individual' या 'Retailer' भेज देते हैं
+      businessType: "Individual", 
+      
+      // ऑप्शनल लेकिन बैकएंड में कॉलम है
+      gstNumber: "", 
+      latitude: data.latitude,
+      longitude: data.longitude,
+    };
 
-    setIsSubmitting(true);
-    try {
-      await api.post('/api/sellers/apply', data);
-      Alert.alert("Success", "Application submitted! Verification pending.");
+    console.log("📤 Sending payload to backend:", payload);
+
+    const response = await api.post('/api/sellers/apply', payload);
+
+    if (response.status === 201 || response.status === 200) {
+      Alert.alert("Success 🎉", "Application submitted successfully!");
       await refreshUserStatus();
-    } catch (err) {
-      Alert.alert("Error", "Submission failed. Please try again.");
-    } finally {
-      setIsSubmitting(false);
     }
-  };
+  } catch (err: any) {
+    console.error("❌ Backend Error Details:", err.response?.data);
+    const msg = err.response?.data?.message || "Submission failed";
+    Alert.alert("Error", msg);
+  } finally {
+    setIsSubmitting(false);
+  }
+};
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.headerTitle}>Seller Registration</Text>

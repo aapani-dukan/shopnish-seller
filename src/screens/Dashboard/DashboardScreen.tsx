@@ -7,7 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Feather from 'react-native-vector-icons/Feather';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-
+import { useNavigation } from '@react-navigation/native';
 const { width } = Dimensions.get('window');
 
 export default function DashboardScreen({ navigation }: any) {
@@ -26,7 +26,8 @@ export default function DashboardScreen({ navigation }: any) {
         // Fallback for UI testing
         return { 
           todaySales: 0, pendingOrders: 0, activeProducts: 0, newReviews: 0, 
-          isOpen: user?.sellerProfile?.isOpen ?? false, recentOrders: [] 
+          isOpen: user?.isOpen ?? false, 
+          recentOrders: []
         };
       }
     },
@@ -69,7 +70,7 @@ export default function DashboardScreen({ navigation }: any) {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#001B3A" />
       
-      {/* 🚀 Premium Top Bar (Fixed) */}
+      {/* 🚀 Top Bar */}
       <View style={[styles.statusToggleBar, { backgroundColor: dashboardData?.isOpen ? '#10b981' : '#64748b' }]}>
         <View style={styles.statusInfo}>
           <View style={[styles.statusDot, { backgroundColor: dashboardData?.isOpen ? '#fff' : '#cbd5e1' }]} />
@@ -91,15 +92,27 @@ export default function DashboardScreen({ navigation }: any) {
       >
         {/* Header Section */}
         <View style={styles.header}>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={styles.greeting}>Welcome back,</Text>
-            <Text style={styles.businessName}>{user?.sellerProfile?.businessName || 'Elite Seller'}</Text>
+            {/* 💡 बैकएंड के हिसाब से businessName या business_name */}
+            <Text style={styles.businessName} numberOfLines={1}>
+              {user?.businessName || user?.firstName || 'Elite Seller'}
+            </Text>
           </View>
-          <TouchableOpacity style={styles.profileBtn} onPress={() => navigation.navigate('Profile')}>
+
+          <TouchableOpacity 
+            onPress={() => navigation.navigate('SellerWallet')}
+            style={styles.walletButton}
+          >
+            {/* ✅ फिक्स किया गया आइकॉन: 'credit-card' (Feather Compatible) */}
+            <Feather name="credit-card" size={18} color="#D4AF37" />
+            <Text style={styles.walletButtonText}>Wallet</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={[styles.profileBtn, { marginLeft: 10 }]} onPress={() => navigation.navigate('Profile')}>
              <Feather name="settings" size={22} color="#001B3A" />
           </TouchableOpacity>
         </View>
-
         {/* Sales Hero Card (Shopnish Navy Blue) */}
         <View style={styles.heroCard}>
           <Text style={styles.heroLabel}>Total Revenue (Today)</Text>
@@ -225,5 +238,19 @@ const styles = StyleSheet.create({
   actionIcon: { padding: 14, borderRadius: 15, marginBottom: 8 },
   actionText: { fontWeight: '800', color: '#001B3A', fontSize: 13 },
   emptyState: { padding: 50, alignItems: 'center' },
-  emptyText: { color: '#94a3b8', fontSize: 13, textAlign: 'center', marginTop: 10 }
+  emptyText: { color: '#94a3b8', fontSize: 13, textAlign: 'center', marginTop: 10 },
+  walletButton: { 
+    flexDirection: 'row', 
+    backgroundColor: '#001B3A', 
+    paddingHorizontal: 15, 
+    paddingVertical: 8, 
+    borderRadius: 20,
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+  },
+
+  walletButtonText: { color: '#fff', marginLeft: 8, fontWeight: '700' }
 });

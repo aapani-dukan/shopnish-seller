@@ -1,5 +1,6 @@
 import axios from "axios";
-import auth from "@react-native-firebase/auth";
+// ✅ Modular imports
+import { getAuth,getIdToken } from "@react-native-firebase/auth";
 
 const api = axios.create({
   baseURL: "https://shopnish-seprate.onrender.com", 
@@ -10,16 +11,23 @@ const api = axios.create({
 });
 
 api.interceptors.request.use(
-  async (config) => {
+  async (config: any) => {
     try {
-      const user = auth().currentUser;
+      const auth = getAuth();
+      const user = auth.currentUser;
+      
       if (user) {
-        // ताज़ा टोकन लेना
-        const token = await user.getIdToken(true); 
+        // 🔥 बदलाव 1: getIdToken(true) के बजाय बिना पैरामीटर के यूज़ करें 
+        // अगर बैकएंड 403 दे रहा है, तो नया टोकन लेने के लिए इसे ऐसे लिखें:
+        const token = await getIdToken(user); 
+        
         if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
+          // 🔥 बदलाव 2: पुराने Axios में headers को सीधे असाइन करना बेहतर है
+          config.headers = {
+            ...config.headers,
+            Authorization: `Bearer ${token}`,
+          };
           
-          // ✅ FormData (Images) के लिए Content-Type को ऑटो-मैनेज करें
           if (config.data instanceof FormData) {
             config.headers["Content-Type"] = "multipart/form-data";
           }
@@ -36,14 +44,14 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // अगर सर्वर से कोई रिस्पॉन्स न मिले (Network Error)
-    if (!error.response) {
-      console.warn("🌐 [API] Network Error - Server Unreachable");
+    // 💡 अगर 403 आ रहा है, तो इसका मतलब टोकन गलत नहीं है, 
+    // बल्कि बैकएंड आपको उस डेटा का एक्सेस नहीं दे रहा।
+    if (error.response?.status === 403) {
+      console.error("🚫 [API] Forbidden: Check User Permissions/Approval");
     }
     
-    if (error.response && error.response.status === 401) {
+    if (error.response?.status === 401) {
       console.log("🚫 [API] Session Expired");
-      // यहाँ logoutUser() कॉल करने की ज़रूरत नहीं क्योंकि queryClient.ts इसे संभाल लेगा
     }
     return Promise.reject(error);
   }

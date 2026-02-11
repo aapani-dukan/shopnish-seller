@@ -1,10 +1,17 @@
-import auth from '@react-native-firebase/auth';
+import { 
+  getAuth, 
+  getIdToken,
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  onAuthStateChanged, 
+  signOut, 
+  sendPasswordResetEmail, 
+  signInWithPhoneNumber,
+  FirebaseAuthTypes
+} from '@react-native-firebase/auth';
 
-/**
- * Native Firebase Instance
- * इसे पूरे ऐप में इस्तेमाल किया जाएगा।
- */
-export const authInstance = auth();
+// ✅ Auth instance को एक बार इनिशियलाइज़ करें (Permanent Fix)
+const auth = getAuth();
 
 /* ==========================================================================
    AUTH HELPERS (SELLER OPTIMIZED - MODERN SDK)
@@ -12,27 +19,28 @@ export const authInstance = auth();
 
 /**
  * Email Sign In
- * सेलर के लिए लॉगिन करते समय आईडी टोकन को रिफ्रेश करना ज़रूरी है।
  */
 export const signInWithEmail = async (email: string, password: string) => {
   try {
-    // आधुनिक तरीका: auth() का सीधा इस्तेमाल
-    const userCredential = await auth().signInWithEmailAndPassword(email, password);
-    // ताज़ा आईडी टोकन लें (Force refresh: true)
-    const token = await userCredential.user.getIdToken(true);
+    // Modern Syntax
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    
+    // ✅ ULTRA-MODERN WAY (Warning-Free):
+    // यहाँ 'user.getIdToken()' के बजाय 'getIdToken(user)' का इस्तेमाल करें
+    const token = await getIdToken(userCredential.user);
+    
     return { user: userCredential.user, token };
   } catch (error: any) {
     console.error("Firebase Login Error:", error.code);
     throw error;
   }
 };
-
 /**
  * Email Sign Up
  */
 export const signUpWithEmail = async (email: string, password: string) => {
   try {
-    const userCredential = await auth().createUserWithEmailAndPassword(email, password);
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     return userCredential.user;
   } catch (error: any) {
     console.error("Firebase Signup Error:", error.code);
@@ -42,10 +50,10 @@ export const signUpWithEmail = async (email: string, password: string) => {
 
 /**
  * Auth State Change Listener
- * वार्निंग खत्म करने के लिए आधुनिक modular सिंटैक्स
  */
-export const onAuthStateChange = (callback: (user: any) => void) => {
-  return auth().onAuthStateChanged(callback);
+export const onAuthStateChange = (callback: (user: FirebaseAuthTypes.User | null) => void) => {
+  // ✅ Modern Syntax: onAuthStateChanged(auth, callback)
+  return onAuthStateChanged(auth, callback);
 };
 
 /**
@@ -53,7 +61,7 @@ export const onAuthStateChange = (callback: (user: any) => void) => {
  */
 export const logoutUser = async () => {
   try {
-    await auth().signOut();
+    await signOut(auth);
   } catch (error) {
     console.error("Firebase Logout Error:", error);
     throw error;
@@ -64,16 +72,15 @@ export const logoutUser = async () => {
  * Password Reset
  */
 export const sendPasswordReset = (email: string) => {
-  return auth().sendPasswordResetEmail(email);
+  return sendPasswordResetEmail(auth, email);
 };
 
 /**
  * Phone OTP Verification
- * यह फंक्शन सीधा ConfirmationResult वापस करेगा
  */
 export const sendOtpToPhone = async (phoneNumber: string) => {
   try {
-    const confirmation = await auth().signInWithPhoneNumber(phoneNumber);
+    const confirmation = await signInWithPhoneNumber(auth, phoneNumber);
     return confirmation;
   } catch (error: any) {
     console.error("Firebase SMS Error:", error.code);
@@ -81,5 +88,5 @@ export const sendOtpToPhone = async (phoneNumber: string) => {
   }
 };
 
-// Default Export
+// Default Export (जरूरत पड़ने पर)
 export default auth;

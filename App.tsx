@@ -8,7 +8,12 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { queryClient } from './src/lib/queryClient';
 import AppNavigator from './src/navigation/AppNavigator';
+import { LogBox } from 'react-native';
 
+LogBox.ignoreLogs([
+  'This method is deprecated (as well as all React Native Firebase namespaced API)',
+  'Method called was `getIdToken`'
+]);
 // एक छोटा सा Inner Component ताकि हम useAuth का इस्तेमाल कर सकें
 function RootApp() {
   const { isLoadingAuth } = useAuth();
