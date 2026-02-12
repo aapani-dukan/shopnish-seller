@@ -13,16 +13,33 @@ export default function InventoryScreen({ navigation }: any) {
   const [searchTerm, setSearchTerm] = useState('');
 
   const fetchProducts = useCallback(async () => {
-    try {
-      const response = await api.get('/products/seller');
-      setProducts(response.data.products || []);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+  try {
+    // 1. पाथ को सही किया (/api जोड़ा)
+    const response = await api.get('/api/products/seller'); 
+    
+    // 2. डेटा हैंडलिंग (चेक करें कि रिस्पॉन्स में products है या सीधा एरे)
+    const data = response.data.products || response.data;
+    setProducts(data);
+  } catch (err: any) {
+    console.error("Inventory Fetch Error:", err.response?.status);
+    if(err.response?.status === 404) {
+       Alert.alert("Error", "Backend path nahi mila. Please /api check karein.");
     }
-  }, []);
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+}, []);
+// 3. टॉगल स्टॉक फंक्शन (Zomato जैसा "Quick Stock Update")
+const toggleStock = async (id: string, currentStock: number) => {
+  try {
+    const newStock = currentStock > 0 ? 0 : 10; // 0 है तो 10 कर दो, वरना 0
+    await api.patch(`/api/products/${id}`, { stock: newStock });
+    fetchProducts(); // लिस्ट रिफ्रेश करें
+  } catch (err) {
+    Alert.alert("Error", "Stock update nahi ho paya");
+  }
+};
 
   useEffect(() => { fetchProducts(); }, [fetchProducts]);
 
@@ -53,33 +70,59 @@ export default function InventoryScreen({ navigation }: any) {
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const renderProduct = ({ item }: any) => (
-    <View style={styles.card}>
-      <Image source={{ uri: item.image }} style={styles.img} />
+  const renderProduct = ({ item }: any) => {
+  const isOutOfStock = item.stock <= 0;
+  
+  // Status Color Logic
+  const statusColor = item.approvalStatus === 'approved' ? '#10b981' : '#f59e0b';
+
+  return (
+    <View style={[styles.card, isOutOfStock && { opacity: 0.8 }]}>
+      {/* Product Image Section */}
+      <View style={styles.imageContainer}>
+        <Image source={{ uri: item.image }} style={styles.img} />
+        {isOutOfStock && (
+          <View style={styles.outOfStockOverlay}>
+            <Text style={styles.outOfStockText}>SOLD OUT</Text>
+          </View>
+        )}
+      </View>
       
+      {/* Product Info Section */}
       <View style={styles.info}>
-        <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
-        <Text style={styles.price}>₹{Number(item.price).toFixed(2)}</Text>
+        <View>
+          <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
+          <Text style={styles.price}>₹{Number(item.price).toLocaleString()}</Text>
+        </View>
         
         <View style={styles.stockRow}>
-          <View style={[styles.stockBadge, { backgroundColor: item.stock > 5 ? '#ecfdf5' : '#fef2f2' }]}>
-            <Text style={[styles.stockText, { color: item.stock > 5 ? '#059669' : '#dc2626' }]}>
-              Stock: {item.stock}
+          {/* Quick Info Badges */}
+          <View style={[styles.modernBadge, { borderColor: isOutOfStock ? '#ef4444' : '#e2e8f0' }]}>
+            <View style={[styles.dot, { backgroundColor: isOutOfStock ? '#ef4444' : '#10b981' }]} />
+            <Text style={[styles.stockText, { color: isOutOfStock ? '#ef4444' : '#1e293b' }]}>
+              {isOutOfStock ? 'No Stock' : `${item.stock} in stock`}
             </Text>
           </View>
-          <Text style={styles.statusBadge}>{item.approvalstatus === 'approved' ? '✅ Live' : '⏳ Pending'}</Text>
+
+          <View style={[styles.statusBadgeModern, { backgroundColor: statusColor + '15' }]}>
+            <Text style={[styles.statusTextModern, { color: statusColor }]}>
+              {item.approvalStatus === 'approved' ? 'LIVE' : 'PENDING'}
+            </Text>
+          </View>
         </View>
       </View>
 
-      <View style={styles.actions}>
+      {/* Modern Actions Section */}
+      <View style={styles.actionsColumn}>
         <TouchableOpacity 
-          style={styles.actionBtn} 
+          style={styles.iconCircle} 
           onPress={() => navigation.navigate('EditProduct', { productId: item.id })}
         >
-          <Feather name="edit-2" size={18} color="#1e40af" />
+          <Feather name="edit-3" size={18} color="#1e40af" />
         </TouchableOpacity>
+        
         <TouchableOpacity 
-          style={[styles.actionBtn, { marginTop: 10 }]} 
+          style={[styles.iconCircle, { backgroundColor: '#fef2f2' }]} 
           onPress={() => deleteProduct(item.id)}
         >
           <Feather name="trash-2" size={18} color="#ef4444" />
@@ -87,11 +130,10 @@ export default function InventoryScreen({ navigation }: any) {
       </View>
     </View>
   );
-
-  if (loading && !refreshing) {
+};
+if (loading && !refreshing) {
     return <View style={styles.center}><ActivityIndicator size="large" color="#1e40af" /></View>;
   }
-
   return (
     <View style={styles.container}>
       {/* Header with Search */}
@@ -174,6 +216,65 @@ const styles = StyleSheet.create({
     elevation: 2, 
     shadowColor: '#000', 
     shadowOpacity: 0.05 
+  },
+  imageContainer: { 
+    position: 'relative',
+    width: 90,
+    height: 90,
+  },
+  outOfStockOverlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)', // हल्का काला पर्दा
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10
+  },
+  outOfStockText: { 
+    color: '#fff', 
+    fontSize: 10, 
+    fontWeight: 'bold',
+    textAlign: 'center'
+  },
+  modernBadge: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    paddingHorizontal: 8, 
+    paddingVertical: 4, 
+    borderRadius: 8, 
+    borderWidth: 1,
+    borderColor: '#e2e8f0'
+  },
+  dot: { 
+    width: 6, 
+    height: 6, 
+    borderRadius: 3, 
+    marginRight: 6 
+  },
+  statusBadgeModern: { 
+    paddingHorizontal: 8, 
+    paddingVertical: 4, 
+    borderRadius: 8 
+  },
+  statusTextModern: { 
+    fontSize: 10, 
+    fontWeight: 'bold' 
+  },
+  actionsColumn: { 
+    gap: 10, 
+    paddingLeft: 10, 
+    borderLeftWidth: 1, 
+    borderLeftColor: '#f1f5f9',
+    justifyContent: 'center'
+  },
+  iconCircle: { 
+    width: 36, 
+    height: 36, 
+    borderRadius: 18, 
+    backgroundColor: '#eff6ff', 
+    justifyContent: 'center', 
+    alignItems: 'center' 
   },
   img: { width: 80, height: 80, borderRadius: 10, backgroundColor: '#f1f5f9' },
   info: { flex: 1, marginLeft: 15, justifyContent: 'center' },

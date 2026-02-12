@@ -1,41 +1,64 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, Text, TextInput, TouchableOpacity, FlatList, 
-  StyleSheet, Image, ActivityIndicator, Alert, ScrollView 
+  StyleSheet, Image, ActivityIndicator, Alert, ScrollView, Dimensions 
 } from 'react-native';
 import Feather from 'react-native-vector-icons/Feather';
 import { launchImageLibrary } from 'react-native-image-picker';
 import api from '../../services/api';
 
+const { width } = Dimensions.get('window');
+
 export default function AddProductScreen({ navigation }: any) {
   const [mode, setMode] = useState<'catalog' | 'manual'>('catalog');
   const [loading, setLoading] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
+  
+  // Search & Categories
   const [searchTerm, setSearchTerm] = useState('');
+  const [categories, setCategories] = useState<any[]>([]);
+  const [selectedCat, setSelectedCat] = useState('all');
   const [masterProducts, setMasterProducts] = useState([]);
+  
+  // Selection States
   const [selectedItems, setSelectedItems] = useState<any>({});
-  const [image, setImage] = useState<string | null>(null);
-
-  // Manual Form State
+  
+  // Manual Mode State
   const [manualData, setManualData] = useState({
-    name: '', price: '', stock: '', description: '', categoryId: ''
+    name: '', price: '', stock: '', description: '', categoryId: '', image: ''
   });
 
-  // 1. Catalog Search Logic
+  // 1. Fetch Categories (Web logic)
   useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
-      if (searchTerm.length > 2) fetchMasterProducts();
-    }, 500);
-    return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm]);
+    const fetchCats = async () => {
+      try {
+        const res = await api.get('/api/categories');
+        setCategories(res.data);
+      } catch (err) { console.log("Category error", err); }
+    };
+    fetchCats();
+  }, []);
 
-  const fetchMasterProducts = async () => {
-    try {
-      const res = await api.get(`/api/products/master-search?q=${searchTerm}`);
-      setMasterProducts(res.data);
-    } catch (err) { console.log(err); }
-  };
+  // 2. Master Search with Debounce (Optimized)
+  useEffect(() => {
+    const fetchMasterData = async () => {
+      if (mode !== 'catalog') return;
+      if (!selectedCat && searchTerm.length < 2) {
+        setMasterProducts([]);
+        return;
+      }
+      try {
+        let url = `/api/products/master-search?q=${searchTerm}`;
+        if (selectedCat !== "all") url += `&categoryId=${selectedCat}`;
+        const res = await api.get(url);
+        setMasterProducts(res.data);
+      } catch (err) { console.log("Search failed", err); }
+    };
+    const timer = setTimeout(fetchMasterData, 400);
+    return () => clearTimeout(timer);
+  }, [selectedCat, searchTerm, mode]);
 
-  // 2. Catalog Selection Logic
+  // 3. Catalog Selection Toggle
   const toggleItem = (item: any) => {
     const newItems = { ...selectedItems };
     if (newItems[item.id]) {
@@ -46,17 +69,38 @@ export default function AddProductScreen({ navigation }: any) {
     setSelectedItems(newItems);
   };
 
-  // 3. Image Picker for Manual Mode
-  const pickImage = () => {
-    launchImageLibrary({ mediaType: 'photo', quality: 0.5 }, (response) => {
-      if (response.assets && response.assets[0].uri) {
-        setImage(response.assets[0].uri);
+  // 4. Cloudinary Image Upload (जैसा वेब में था)
+  const handleImagePick = async () => {
+    const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.6 });
+    if (result.assets && result.assets[0]) {
+      const file = result.assets[0];
+      setImageUploading(true);
+      
+      const data = new FormData();
+      data.append('file', {
+        uri: file.uri,
+        type: file.type,
+        name: file.fileName || 'upload.jpg',
+      } as any);
+      data.append('upload_preset', 'shopnish_products');
+
+      try {
+        const res = await fetch(`https://api.cloudinary.com/v1_1/dcah0b2jy/image/upload`, {
+          method: 'POST',
+          body: data,
+        });
+        const fileData = await res.json();
+        setManualData({ ...manualData, image: fileData.secure_url });
+      } catch (err) {
+        Alert.alert("Upload Failed", "Photo upload nahi ho saki.");
+      } finally {
+        setImageUploading(false);
       }
-    });
+    }
   };
 
-  // 4. Submit Logic
-  const handleAddProducts = async () => {
+  // 5. Submit Handler (Dual Mode)
+  const handleSubmit = async () => {
     setLoading(true);
     try {
       if (mode === 'catalog') {
@@ -68,15 +112,16 @@ export default function AddProductScreen({ navigation }: any) {
           price: Number(item.price),
           stock: Number(item.stock),
         }));
+        if (payload.length === 0) throw new Error("Item select karein");
         await api.post('/api/products/bulk', { products: payload });
       } else {
-        // Manual upload logic (Cloudinary etc.)
-        await api.post('/api/products', { ...manualData, image });
+        if (!manualData.image) throw new Error("Photo upload karein");
+        await api.post('/api/products', manualData);
       }
-      Alert.alert("Success", "Products aapki dukaan mein jud gaye hain!");
+      Alert.alert("Success 🎉", "Aapka product live ho gaya hai!");
       navigation.goBack();
-    } catch (err) {
-      Alert.alert("Error", "Kuch galat hua, phir se try karein.");
+    } catch (err: any) {
+      Alert.alert("Error", err.message || "Submit nahi ho paya.");
     } finally {
       setLoading(false);
     }
@@ -88,29 +133,42 @@ export default function AddProductScreen({ navigation }: any) {
       <View style={[styles.itemCard, isSelected && styles.selectedCard]}>
         <View style={styles.itemMain}>
           <Image source={{ uri: item.image }} style={styles.itemImg} />
-          <View style={{ flex: 1, marginLeft: 10 }}>
-            <Text style={styles.itemName}>{item.name}</Text>
-            <Text style={styles.itemBrand}>{item.brand || 'No Brand'}</Text>
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+            <View style={styles.badgeRow}>
+              <Text style={styles.itemBrand}>{item.brand || 'No Brand'}</Text>
+              {item.unit && <Text style={styles.unitBadge}>{item.unit}</Text>}
+            </View>
           </View>
           <TouchableOpacity onPress={() => toggleItem(item)}>
-            <Feather name={isSelected ? "check-circle" : "plus-circle"} size={28} color={isSelected ? "#10b981" : "#1e40af"} />
+            <Feather 
+              name={isSelected ? "check-circle" : "plus-circle"} 
+              size={26} 
+              color={isSelected ? "#001B3A" : "#94a3b8"} 
+            />
           </TouchableOpacity>
         </View>
         
         {isSelected && (
-          <View style={styles.inputRow}>
-            <TextInput 
-              style={styles.smallInput} 
-              placeholder="Price ₹" 
-              keyboardType="numeric" 
-              onChangeText={(txt) => setSelectedItems({...selectedItems, [item.id]: {...selectedItems[item.id], price: txt}})}
-            />
-            <TextInput 
-              style={styles.smallInput} 
-              placeholder="Stock" 
-              keyboardType="numeric"
-              onChangeText={(txt) => setSelectedItems({...selectedItems, [item.id]: {...selectedItems[item.id], stock: txt}})}
-            />
+          <View style={styles.selectionInputs}>
+            <View style={styles.miniInputGroup}>
+              <Text style={styles.miniLabel}>Price (₹)</Text>
+              <TextInput 
+                style={styles.miniInput} 
+                placeholder="0.00" 
+                keyboardType="numeric" 
+                onChangeText={(v) => setSelectedItems({...selectedItems, [item.id]: {...selectedItems[item.id], price: v}})}
+              />
+            </View>
+            <View style={styles.miniInputGroup}>
+              <Text style={styles.miniLabel}>Stock</Text>
+              <TextInput 
+                style={styles.miniInput} 
+                placeholder="10" 
+                keyboardType="numeric"
+                onChangeText={(v) => setSelectedItems({...selectedItems, [item.id]: {...selectedItems[item.id], stock: v}})}
+              />
+            </View>
           </View>
         )}
       </View>
@@ -119,82 +177,169 @@ export default function AddProductScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      {/* Mode Switcher */}
-      <View style={styles.tabBar}>
-        <TouchableOpacity style={[styles.tab, mode === 'catalog' && styles.activeTab]} onPress={() => setMode('catalog')}>
-          <Text style={[styles.tabText, mode === 'catalog' && styles.activeTabText]}>Catalog Search</Text>
+      {/* Header Tabs */}
+      <View style={styles.headerTabs}>
+        <TouchableOpacity 
+          style={[styles.tab, mode === 'catalog' && styles.activeTab]} 
+          onPress={() => setMode('catalog')}
+        >
+          <Text style={[styles.tabText, mode === 'catalog' && styles.activeTabText]}>Quick Catalog</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.tab, mode === 'manual' && styles.activeTab]} onPress={() => setMode('manual')}>
+        <TouchableOpacity 
+          style={[styles.tab, mode === 'manual' && styles.activeTab]} 
+          onPress={() => setMode('manual')}
+        >
           <Text style={[styles.tabText, mode === 'manual' && styles.activeTabText]}>Manual Add</Text>
         </TouchableOpacity>
       </View>
 
       {mode === 'catalog' ? (
         <View style={{ flex: 1 }}>
-          <View style={styles.searchBox}>
-            <Feather name="search" size={20} color="#94a3b8" />
-            <TextInput 
-              placeholder="Product ka naam likhein..." 
-              style={styles.searchInput}
-              value={searchTerm}
-              onChangeText={setSearchTerm}
-            />
+          {/* Catalog Filters */}
+          <View style={styles.filterSection}>
+            <View style={styles.searchBar}>
+              <Feather name="search" size={18} color="#94a3b8" />
+              <TextInput 
+                placeholder="Product name..." 
+                style={styles.searchInput}
+                value={searchTerm}
+                onChangeText={setSearchTerm}
+              />
+            </View>
+            
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScroll}>
+              <TouchableOpacity 
+                style={[styles.catPill, selectedCat === 'all' && styles.activeCatPill]}
+                onPress={() => setSelectedCat('all')}
+              >
+                <Text style={[styles.catPillText, selectedCat === 'all' && styles.activeCatPillText]}>All</Text>
+              </TouchableOpacity>
+              {categories.map((c: any) => (
+                <TouchableOpacity 
+                  key={c.id} 
+                  style={[styles.catPill, selectedCat === c.id.toString() && styles.activeCatPill]}
+                  onPress={() => setSelectedCat(c.id.toString())}
+                >
+                  <Text style={[styles.catPillText, selectedCat === c.id.toString() && styles.activeCatPillText]}>{c.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
+
           <FlatList 
             data={masterProducts}
             keyExtractor={(item: any) => item.id.toString()}
             renderItem={renderMasterItem}
-            contentContainerStyle={{ padding: 15 }}
-            ListEmptyComponent={<Text style={styles.emptyText}>Items khojne ke liye type karein...</Text>}
+            contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+            ListEmptyComponent={
+              <View style={styles.emptyState}>
+                <Feather name="package" size={50} color="#e2e8f0" />
+                <Text style={styles.emptyText}>Items dhoondne ke liye type karein ya category chunein</Text>
+              </View>
+            }
           />
         </View>
       ) : (
-        <ScrollView style={{ flex: 1, padding: 20 }}>
-          <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
-            {image ? <Image source={{ uri: image }} style={styles.previewImg} /> : <Feather name="camera" size={40} color="#94a3b8" />}
-            <Text style={{ color: '#94a3b8', marginTop: 10 }}>Product Photo Upload Karein</Text>
+        <ScrollView style={styles.manualForm} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+          <TouchableOpacity style={styles.imageUpload} onPress={handleImagePick}>
+            {manualData.image ? (
+              <Image source={{ uri: manualData.image }} style={styles.uploadedImg} />
+            ) : (
+              <View style={{ alignItems: 'center' }}>
+                {imageUploading ? <ActivityIndicator color="#001B3A" /> : <Feather name="camera" size={40} color="#94a3b8" />}
+                <Text style={styles.uploadLabel}>Upload High Quality Image</Text>
+              </View>
+            )}
           </TouchableOpacity>
-          <TextInput placeholder="Product Name" style={styles.input} onChangeText={(v) => setManualData({...manualData, name: v})} />
-          <TextInput placeholder="Description" multiline style={[styles.input, { height: 100 }]} onChangeText={(v) => setManualData({...manualData, description: v})} />
+
+          <Text style={styles.fieldLabel}>PRODUCT NAME</Text>
+          <TextInput style={styles.fullInput} placeholder="e.g. Fresh Organic Apples" onChangeText={(v) => setManualData({...manualData, name: v})} />
+          
+          <Text style={styles.fieldLabel}>DESCRIPTION</Text>
+          <TextInput style={[styles.fullInput, { height: 100 }]} multiline placeholder="Tell buyers about this product..." onChangeText={(v) => setManualData({...manualData, description: v})} />
+
           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            <TextInput placeholder="Price ₹" keyboardType="numeric" style={[styles.input, { width: '48%' }]} onChangeText={(v) => setManualData({...manualData, price: v})} />
-            <TextInput placeholder="Stock" keyboardType="numeric" style={[styles.input, { width: '48%' }]} onChangeText={(v) => setManualData({...manualData, stock: v})} />
+            <View style={{ width: '48%' }}>
+              <Text style={styles.fieldLabel}>PRICE (₹)</Text>
+              <TextInput style={styles.fullInput} keyboardType="numeric" placeholder="0" onChangeText={(v) => setManualData({...manualData, price: v})} />
+            </View>
+            <View style={{ width: '48%' }}>
+              <Text style={styles.fieldLabel}>STOCK</Text>
+              <TextInput style={styles.fullInput} keyboardType="numeric" placeholder="0" onChangeText={(v) => setManualData({...manualData, stock: v})} />
+            </View>
+          </View>
+
+          <Text style={styles.fieldLabel}>CATEGORY</Text>
+          <View style={styles.fullInput}>
+             {/* Simple Dropdown Logic or Picker can be added here */}
+             <TextInput placeholder="Select Category ID" onChangeText={(v) => setManualData({...manualData, categoryId: v})} />
           </View>
         </ScrollView>
       )}
 
-      <TouchableOpacity 
-        style={[styles.submitBtn, (mode === 'catalog' && Object.keys(selectedItems).length === 0) && { backgroundColor: '#cbd5e1' }]} 
-        onPress={handleAddProducts}
-        disabled={loading}
-      >
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>Confirm & Add to Shop</Text>}
-      </TouchableOpacity>
+      {/* Floating Action Button */}
+      <View style={styles.footer}>
+        <TouchableOpacity 
+          style={[styles.mainBtn, (mode === 'catalog' && Object.keys(selectedItems).length === 0) && { opacity: 0.5 }]} 
+          onPress={handleSubmit}
+          disabled={loading || imageUploading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.mainBtnText}>
+              {mode === 'catalog' 
+                ? `Add ${Object.keys(selectedItems).length} Products` 
+                : 'Publish Product'}
+            </Text>
+          )}
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
-  tabBar: { flexDirection: 'row', backgroundColor: '#fff', padding: 5, margin: 15, borderRadius: 10, elevation: 2 },
-  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
-  activeTab: { backgroundColor: '#1e40af' },
-  tabText: { fontWeight: 'bold', color: '#64748b' },
-  activeTabText: { color: '#fff' },
-  searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', marginHorizontal: 15, paddingHorizontal: 15, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0' },
-  searchInput: { flex: 1, height: 50, marginLeft: 10 },
-  itemCard: { backgroundColor: '#fff', padding: 12, borderRadius: 12, marginBottom: 10, borderWidth: 1, borderColor: '#e2e8f0' },
-  selectedCard: { borderColor: '#1e40af', backgroundColor: '#eff6ff' },
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  headerTabs: { flexDirection: 'row', backgroundColor: '#F8FAFC', padding: 6, margin: 16, borderRadius: 16 },
+  tab: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 12 },
+  activeTab: { backgroundColor: '#001B3A', elevation: 4, shadowColor: '#001B3A', shadowOpacity: 0.3, shadowRadius: 5 },
+  tabText: { fontWeight: '800', color: '#64748B', fontSize: 13 },
+  activeTabText: { color: '#FFFFFF' },
+  
+  filterSection: { paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F1F5F9', marginHorizontal: 16, paddingHorizontal: 15, borderRadius: 14, height: 50 },
+  searchInput: { flex: 1, marginLeft: 10, fontWeight: '600', color: '#1E293B' },
+  catScroll: { marginTop: 12, paddingLeft: 16 },
+  catPill: { paddingHorizontal: 18, paddingVertical: 8, backgroundColor: '#F8FAFC', borderRadius: 20, marginRight: 8, borderWidth: 1, borderColor: '#E2E8F0' },
+  activeCatPill: { backgroundColor: '#001B3A', borderColor: '#001B3A' },
+  catPillText: { fontSize: 12, fontWeight: '700', color: '#64748B' },
+  activeCatPillText: { color: '#FFF' },
+
+  itemCard: { backgroundColor: '#FFF', padding: 14, borderRadius: 20, marginBottom: 12, borderWidth: 1, borderColor: '#F1F5F9' },
+  selectedCard: { borderColor: '#001B3A', backgroundColor: '#F8FAFC' },
   itemMain: { flexDirection: 'row', alignItems: 'center' },
-  itemImg: { width: 50, height: 50, borderRadius: 8, backgroundColor: '#f1f5f9' },
-  itemName: { fontSize: 15, fontWeight: 'bold', color: '#1e293b' },
-  itemBrand: { fontSize: 12, color: '#1e40af', fontWeight: '600' },
-  inputRow: { flexDirection: 'row', marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#e2e8f0' },
-  smallInput: { flex: 1, height: 40, backgroundColor: '#fff', borderRadius: 8, paddingHorizontal: 10, marginRight: 10, borderWidth: 1, borderColor: '#cbd5e1' },
-  imagePicker: { height: 180, backgroundColor: '#fff', borderRadius: 15, borderStyle: 'dashed', borderWidth: 2, borderColor: '#cbd5e1', justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
-  previewImg: { width: '100%', height: '100%', borderRadius: 15 },
-  input: { backgroundColor: '#fff', padding: 15, borderRadius: 12, marginBottom: 15, borderWidth: 1, borderColor: '#e2e8f0' },
-  submitBtn: { position: 'absolute', bottom: 20, left: 20, right: 20, backgroundColor: '#1e40af', height: 55, borderRadius: 15, justifyContent: 'center', alignItems: 'center', elevation: 4 },
-  submitBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  emptyText: { textAlign: 'center', marginTop: 40, color: '#94a3b8' }
+  itemImg: { width: 60, height: 60, borderRadius: 14, backgroundColor: '#F1F5F9' },
+  itemName: { fontSize: 16, fontWeight: '800', color: '#1E293B' },
+  badgeRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+  itemBrand: { fontSize: 11, color: '#64748B', fontWeight: '700', textTransform: 'uppercase' },
+  unitBadge: { backgroundColor: '#E2E8F0', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, fontSize: 10, fontWeight: '800', marginLeft: 8, color: '#475569' },
+  
+  selectionInputs: { flexDirection: 'row', marginTop: 15, paddingTop: 15, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
+  miniInputGroup: { flex: 1, marginRight: 10 },
+  miniLabel: { fontSize: 9, fontWeight: '800', color: '#94A3B8', marginBottom: 5 },
+  miniInput: { backgroundColor: '#FFF', height: 45, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', paddingHorizontal: 10, fontWeight: '700' },
+
+  manualForm: { padding: 16 },
+  imageUpload: { height: 200, backgroundColor: '#F8FAFC', borderRadius: 24, borderStyle: 'dashed', borderWidth: 2, borderColor: '#CBD5E1', justifyContent: 'center', alignItems: 'center', marginBottom: 25 },
+  uploadedImg: { width: '100%', height: '100%', borderRadius: 24 },
+  uploadLabel: { color: '#94A3B8', marginTop: 12, fontWeight: '700', fontSize: 12 },
+  fieldLabel: { fontSize: 10, fontWeight: '800', color: '#94A3B8', letterSpacing: 1, marginBottom: 8, marginTop: 15 },
+  fullInput: { backgroundColor: '#F8FAFC', padding: 15, borderRadius: 16, borderWidth: 1, borderColor: '#F1F5F9', fontSize: 15, fontWeight: '600', color: '#1E293B' },
+
+  footer: { position: 'absolute', bottom: 0, width: '100%', padding: 20, backgroundColor: 'rgba(255,255,255,0.9)' },
+  mainBtn: { backgroundColor: '#001B3A', height: 60, borderRadius: 18, justifyContent: 'center', alignItems: 'center', elevation: 8, shadowColor: '#001B3A', shadowOpacity: 0.3, shadowRadius: 10 },
+  mainBtnText: { color: '#FFF', fontSize: 17, fontWeight: '900' },
+  emptyState: { alignItems: 'center', marginTop: 60 },
+  emptyText: { textAlign: 'center', color: '#94A3B8', marginTop: 15, paddingHorizontal: 40, fontWeight: '500' }
 });

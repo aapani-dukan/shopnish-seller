@@ -20,26 +20,36 @@ const statusConfig: any = {
 };
 
 export default function OrdersScreen({ navigation }: any) {
-  const [orders, setOrders] = useState([]);
+ const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState('all');
 
   const fetchOrders = useCallback(async () => {
-    try {
-      const response = await api.get('/suborders/seller');
-      // Latest orders upar dikhane ke liye sort karein
-      const sortedOrders = (response.data.subOrders || []).sort((a: any, b: any) => 
-        new Date(b.createdat).getTime() - new Date(a.createdat).getTime()
-      );
-      setOrders(sortedOrders);
-    } catch (err) {
-      console.error('Failed to fetch orders:', err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+  try {
+    // ✅ URL को बैकएंड के राउट से मैच किया (api/sellers/orders)
+    const response = await api.get('/api/sellers/orders'); 
+    
+    // ✅ आपका बैकएंड सीधा Array भेज रहा है, इसलिए response.data का उपयोग करें
+    const rawData = Array.isArray(response.data) ? response.data : [];
+
+    // Latest orders ऊपर दिखाने के लिए (createdat को चेक करें, आपके DB में createdAt हो सकता है)
+    const sortedOrders = rawData.sort((a: any, b: any) => 
+      new Date(b.createdAt || b.createdat).getTime() - new Date(a.createdAt || a.createdat).getTime()
+    );
+    
+    setOrders(sortedOrders);
+  } catch (err: any) {
+  // यह लाइन आपको बताएगी कि मोबाइल ऐप ने किस URL पर रिक्वेस्ट भेजी थी
+  console.log("❌ Full Request URL:", err.config?.baseURL + err.config?.url);
+  console.log("❌ Status Code:", err.response?.status);
+  console.error('Failed to fetch orders:', err);
+
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+}, []);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
 

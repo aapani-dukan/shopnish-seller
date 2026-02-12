@@ -35,9 +35,11 @@ export default function DashboardScreen({ navigation }: any) {
 
   // 2. Toggle Store Mutation (Zomato style quick toggle)
   const toggleStore = useMutation({
-    mutationFn: async (status: boolean) => {
-      return await api.patch('/api/sellers/toggle-status', { isOpen: status });
-    },
+ mutationFn: async (status: boolean) => {
+  return await api.patch('/api/sellers/toggle-status', { 
+    is_open: status 
+  });
+},
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['seller-dashboard'] });
       Alert.alert("Store Updated", variables ? "Aapki dukaan ab live hai! 🚀" : "Dukaan band kar di gayi hai.");

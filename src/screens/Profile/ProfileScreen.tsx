@@ -48,7 +48,7 @@ export default function ProfileScreen({ navigation }: any) {
         
         <View style={styles.badgeRow}>
           <View style={styles.verifiedBadge}>
-            <Feather name="check-verified" size={12} color="#1e40af" />
+            <Feather name="check-circle" size={20} color="#10b981" />
             <Text style={styles.verifiedText}>Verified Seller</Text>
           </View>
         </View>
