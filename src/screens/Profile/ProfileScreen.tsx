@@ -29,7 +29,26 @@ export default function ProfileScreen({ navigation }: any) {
       {showArrow && <Feather name="chevron-right" size={18} color="#cbd5e1" />}
     </TouchableOpacity>
   );
-
+const handleHelpCenter = () => {
+  // अपना असली WhatsApp नंबर यहाँ डालें (बिना + के, जैसे 918619358117)
+  const phoneNumber = "919928305966"; 
+  const message = "Hello Shopnish Support, I am a seller and I need help with my account.";
+  
+  // WhatsApp का यूनिवर्सल लिंक
+  const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
+  
+  Linking.canOpenURL(whatsappUrl)
+    .then((supported) => {
+      if (supported) {
+        // अगर WhatsApp ऐप इंस्टॉल है तो ऐप खुलेगी
+        return Linking.openURL(whatsappUrl);
+      } else {
+        // अगर ऐप नहीं है तो ब्राउज़र में WhatsApp वेब खुलेगा (404 कभी नहीं आएगा)
+        return Linking.openURL(`https://wa.me/${phoneNumber}`);
+      }
+    })
+    .catch((err) => Alert.alert("Error", "Support link open nahi ho raha hai."));
+};
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Upper Profile Header */}
@@ -70,62 +89,66 @@ export default function ProfileScreen({ navigation }: any) {
         </View>
       </View>
 
-      {/* Business Settings */}
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Business Management</Text>
-        <View style={styles.card}>
-          <ProfileItem 
-            icon="home" 
-            title="Shop Details" 
-            subtitle="Address, Timings, Category"
-            onPress={() => {}} 
-            color="#3b82f6"
-          />
-          <View style={styles.divider} />
-          <ProfileItem 
-            icon="credit-card" 
-            title="Bank Account" 
-            subtitle="Payouts & Settlement details"
-            onPress={() => {}} 
-            color="#10b981"
-          />
-          <View style={styles.divider} />
-          <ProfileItem 
-            icon="file-text" 
-            title="Tax & GST Info" 
-            subtitle="Manage business compliance"
-            onPress={() => {}} 
-            color="#f59e0b"
-          />
-        </View>
-      </View>
+    {/* Business Settings */}
+<View style={styles.section}>
+  <Text style={styles.sectionLabel}>Business Management</Text>
+  <View style={styles.card}>
+    <ProfileItem 
+      icon="home" 
+      title="Shop Details" 
+      subtitle="Address, Timings, Category"
+      // ✅ नेविगेशन जोड़ें (पक्का करें कि ये नाम आपके Navigator में हों)
+      onPress={() => navigation.navigate('ShopDetails')} 
+      color="#3b82f6"
+    />
+    <View style={styles.divider} />
+    <ProfileItem 
+      icon="credit-card" 
+      title="Bank Account" 
+      subtitle="Payouts & Settlement details"
+      // ✅ अब यह आपकी BankDetails screen खोलेगा
+      onPress={() => navigation.navigate('BankDetails')} 
+      color="#10b981"
+    />
+    <View style={styles.divider} />
+    <ProfileItem 
+      icon="file-text" 
+      title="Tax & GST Info" 
+      subtitle="Manage business compliance"
+      onPress={() => navigation.navigate('TaxInfo')} 
+      color="#f59e0b"
+    />
+  </View>
+</View>
 
-      {/* Support & Others */}
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Support & Legal</Text>
-        <View style={styles.card}>
-          <ProfileItem 
-            icon="help-circle" 
-            title="Help Center" 
-            onPress={() => Linking.openURL('https://your-support-url.com')} 
-          />
-          <View style={styles.divider} />
-          <ProfileItem 
-            icon="shield" 
-            title="Privacy Policy" 
-            onPress={() => {}} 
-          />
-          <View style={styles.divider} />
-          <ProfileItem 
-            icon="log-out" 
-            title="Logout" 
-            onPress={handleLogout} 
-            color="#ef4444"
-            showArrow={false}
-          />
-        </View>
-      </View>
-
+{/* Support & Others */}
+<View style={styles.section}>
+  <Text style={styles.sectionLabel}>Support & Legal</Text>
+  <View style={styles.card}>
+    <ProfileItem 
+      icon="help-circle" 
+      title="Help Center" 
+      // ✅ हेल्प सेंटर के लिए WhatsApp या अपनी वेबसाइट का सही लिंक
+      onPress={() => Linking.openURL('https://shopnish.com/support').catch(() => Alert.alert("Error", "Link nahi khul raha"))} 
+    />
+    <View style={styles.divider} />
+   <ProfileItem 
+  icon="help-circle" 
+  title="Help Center" 
+  // ❌ पुराना वाला: onPress={() => Linking.openURL('...')} 
+  // ✅ नया वाला:
+  onPress={handleHelpCenter} 
+/>
+    <View style={styles.divider} />
+    <ProfileItem 
+      icon="log-out" 
+      title="Logout" 
+      onPress={handleLogout} 
+      color="#ef4444"
+      showArrow={false}
+    />
+  </View>
+</View>
       <Text style={styles.versionText}>Shopnish Seller v1.0.24 (Beta)</Text>
     </ScrollView>
   );

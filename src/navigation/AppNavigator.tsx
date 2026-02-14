@@ -22,6 +22,8 @@ import AddProductScreen from '../screens/Inventory/AddProductScreen';
 import EditProductScreen from '../screens/Inventory/EditProductScreen';
 import SellerWalletScreen from '../screens/SellerWalletScreen';
 import BankDetailsScreen from '../screens/Auth/BankDetailsScreen';
+import ShopDetailsScreen from '../screens/Profile/ShopDetailsScreen';
+import TaxInfoScreen from '../screens/Profile/TaxInfoScreen';
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
@@ -112,6 +114,12 @@ export default function AppNavigator() {
     headerShadowVisible: false,
   }} 
 />
+
+<Stack.Screen 
+    name="TaxInfo" 
+    component={TaxInfoScreen} 
+  />
+<Stack.Screen name="ShopDetails" component={ShopDetailsScreen} options={{ headerShown: false }} />
                 <Stack.Screen 
                   name="EditProduct" 
                   component={EditProductScreen} 
