@@ -31,14 +31,44 @@ export default function InventoryScreen({ navigation }: any) {
   }
 }, []);
 // 3. टॉगल स्टॉक फंक्शन (Zomato जैसा "Quick Stock Update")
-const toggleStock = async (id: string, currentStock: number) => {
-  try {
-    const newStock = currentStock > 0 ? 0 : 10; // 0 है तो 10 कर दो, वरना 0
-    await api.patch(`/api/products/${id}`, { stock: newStock });
-    fetchProducts(); // लिस्ट रिफ्रेश करें
-  } catch (err) {
-    Alert.alert("Error", "Stock update nahi ho paya");
-  }
+const toggleStock = async (id: string, currentName: string, currentStock: number) => {
+  // Hum Alert.prompt use kar sakte hain (iOS/Android custom logic) 
+  // ya fir ek simple prompt
+  Alert.prompt(
+    "Update Stock",
+    `${currentName} ka naya stock likhein:`,
+    [
+      {
+        text: "Cancel",
+        style: "cancel"
+      },
+      {
+        text: "Update",
+        onPress: async (newStockValue) => {
+          const stockNum = Number(newStockValue);
+          
+          if (isNaN(stockNum) || stockNum < 0) {
+            Alert.alert("Error", "Kripya sahi number daalein");
+            return;
+          }
+
+          try {
+            // Backend call jo humne pehle fix ki thi
+            await api.patch(`/api/products/${id}`, { stock: stockNum });
+            
+            // ✅ SUCCESS FEEDBACK
+            Alert.alert("Success", "Stock update ho gaya hai");
+            fetchProducts(); // List refresh
+            
+          } catch (err) {
+            Alert.alert("Error", "Stock update nahi ho paya");
+          }
+        }
+      }
+    ],
+    "plain-text",
+    currentStock.toString() // Default value purana stock dikhayega
+  );
 };
 
   useEffect(() => { fetchProducts(); }, [fetchProducts]);
@@ -69,16 +99,18 @@ const toggleStock = async (id: string, currentStock: number) => {
   const filteredProducts = products.filter(p => 
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+// renderProduct function ke andar ye badlav karein:
 
-  const renderProduct = ({ item }: any) => {
+const renderProduct = ({ item }: any) => {
   const isOutOfStock = item.stock <= 0;
+  const isLowStock = item.stock > 0 && item.stock <= 5; // ✅ High-Class Alert
   
-  // Status Color Logic
   const statusColor = item.approvalStatus === 'approved' ? '#10b981' : '#f59e0b';
+  // Stock text color logic
+  const stockColor = isOutOfStock ? '#ef4444' : isLowStock ? '#f59e0b' : '#10b981';
 
   return (
-    <View style={[styles.card, isOutOfStock && { opacity: 0.8 }]}>
-      {/* Product Image Section */}
+    <View style={[styles.card, isOutOfStock && { backgroundColor: '#fdf2f2' }]}>
       <View style={styles.imageContainer}>
         <Image source={{ uri: item.image }} style={styles.img} />
         {isOutOfStock && (
@@ -88,19 +120,17 @@ const toggleStock = async (id: string, currentStock: number) => {
         )}
       </View>
       
-      {/* Product Info Section */}
       <View style={styles.info}>
-        <View>
-          <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
-          <Text style={styles.price}>₹{Number(item.price).toLocaleString()}</Text>
-        </View>
+        <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
+        <Text style={styles.price}>₹{Number(item.price).toLocaleString()}</Text>
         
         <View style={styles.stockRow}>
-          {/* Quick Info Badges */}
-          <View style={[styles.modernBadge, { borderColor: isOutOfStock ? '#ef4444' : '#e2e8f0' }]}>
-            <View style={[styles.dot, { backgroundColor: isOutOfStock ? '#ef4444' : '#10b981' }]} />
-            <Text style={[styles.stockText, { color: isOutOfStock ? '#ef4444' : '#1e293b' }]}>
-              {isOutOfStock ? 'No Stock' : `${item.stock} in stock`}
+          {/* ✅ Improved Stock Badge */}
+          <View style={[styles.modernBadge, { borderColor: stockColor + '40' }]}>
+            <View style={[styles.dot, { backgroundColor: stockColor }]} />
+            <Text style={[styles.stockText, { color: '#1e293b' }]}>
+              {isOutOfStock ? 'Out of Stock' : `${item.stock} Units`}
+              {isLowStock && ' (Low)'} 
             </Text>
           </View>
 
@@ -112,20 +142,36 @@ const toggleStock = async (id: string, currentStock: number) => {
         </View>
       </View>
 
-      {/* Modern Actions Section */}
       <View style={styles.actionsColumn}>
+        {/* Quick Stock Refill Button (Zomato Style) */}
+        <TouchableOpacity 
+          style={styles.iconCircle} 
+         onPress={() => toggleStock(item.id, item.name, item.stock)}
+        >
+          <Feather name="refresh-cw" size={16} color="#1e40af" />
+        </TouchableOpacity>
+
         <TouchableOpacity 
           style={styles.iconCircle} 
           onPress={() => navigation.navigate('EditProduct', { productId: item.id })}
         >
-          <Feather name="edit-3" size={18} color="#1e40af" />
+          <Feather name="edit-2" size={16} color="#1e40af" />
         </TouchableOpacity>
-        
+        <TouchableOpacity 
+  style={[styles.iconCircle, { backgroundColor: isLowStock ? '#fff7ed' : '#f0fdf4' }]} 
+  onPress={() => toggleStock(item.id, item.name, item.stock)} // ✅ Updated call
+>
+  <Feather 
+    name="plus-circle" 
+    size={18} 
+    color={isLowStock ? '#ea580c' : '#16a34a'} 
+  />
+</TouchableOpacity>
         <TouchableOpacity 
           style={[styles.iconCircle, { backgroundColor: '#fef2f2' }]} 
           onPress={() => deleteProduct(item.id)}
         >
-          <Feather name="trash-2" size={18} color="#ef4444" />
+          <Feather name="trash-2" size={16} color="#ef4444" />
         </TouchableOpacity>
       </View>
     </View>

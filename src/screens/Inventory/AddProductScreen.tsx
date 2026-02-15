@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, Text, TextInput, TouchableOpacity, FlatList, 
-  StyleSheet, Image, ActivityIndicator, Alert, ScrollView, Dimensions 
+  StyleSheet, Image, ActivityIndicator, Alert, ScrollView, Dimensions, KeyboardAvoidingView,Platform
 } from 'react-native';
 import Feather from 'react-native-vector-icons/Feather';
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -70,62 +70,113 @@ export default function AddProductScreen({ navigation }: any) {
   };
 
   // 4. Cloudinary Image Upload (जैसा वेब में था)
-  const handleImagePick = async () => {
-    const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.6 });
-    if (result.assets && result.assets[0]) {
-      const file = result.assets[0];
-      setImageUploading(true);
-      
-      const data = new FormData();
-      data.append('file', {
-        uri: file.uri,
-        type: file.type,
-        name: file.fileName || 'upload.jpg',
-      } as any);
-      data.append('upload_preset', 'shopnish_products');
+ const handleImagePick = async () => {
+  const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.6 });
+  if (result.assets && result.assets[0]) {
+    setImageUploading(true);
+    const file = result.assets[0];
+    
+    const formData = new FormData();
+    formData.append('file', {
+     uri: Platform.OS === 'android' ? file.uri! : file.uri!.replace('file://', ''),
+      type: file.type || 'image/jpeg',
+      name: file.fileName || 'product.jpg',
+    } as any);
+    formData.append('upload_preset', 'shopnish_products');
 
-      try {
-        const res = await fetch(`https://api.cloudinary.com/v1_1/dcah0b2jy/image/upload`, {
-          method: 'POST',
-          body: data,
-        });
-        const fileData = await res.json();
-        setManualData({ ...manualData, image: fileData.secure_url });
-      } catch (err) {
-        Alert.alert("Upload Failed", "Photo upload nahi ho saki.");
-      } finally {
-        setImageUploading(false);
-      }
-    }
-  };
-
-  // 5. Submit Handler (Dual Mode)
-  const handleSubmit = async () => {
-    setLoading(true);
     try {
-      if (mode === 'catalog') {
-        const payload = Object.values(selectedItems).map((item: any) => ({
+      // Axios is more stable for large file uploads on mobile
+      const res = await api.post('https://api.cloudinary.com/v1_1/dcah0b2jy/image/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setManualData({ ...manualData, image: res.data.secure_url });
+    } catch (err) {
+      Alert.alert("Upload Failed", "Network check karein aur dobara koshish karein.");
+    } finally {
+      setImageUploading(false);
+    }
+  }
+};
+  // 5. Submit Handler (Industrial Grade)
+const handleSubmit = async () => {
+  // 1. Initial Loading Start
+  setLoading(true);
+
+  try {
+    if (mode === 'catalog') {
+      // --- CATALOG MODE LOGIC ---
+      const selectedArray = Object.values(selectedItems);
+      
+      if (selectedArray.length === 0) {
+        throw new Error("Kripya kam se kam ek product select karein.");
+      }
+
+      // Check karo ki sabhi selected items ka price aur stock bhara hua hai
+      const payload = selectedArray.map((item: any) => {
+        const price = Number(item.price);
+        const stock = Number(item.stock);
+
+        if (!price || price <= 0) {
+          throw new Error(`${item.name} ka price sahi nahi hai.`);
+        }
+
+        return {
           masterProductId: item.id,
           name: item.name,
           image: item.image,
           categoryId: item.categoryId,
-          price: Number(item.price),
-          stock: Number(item.stock),
-        }));
-        if (payload.length === 0) throw new Error("Item select karein");
-        await api.post('/api/products/bulk', { products: payload });
-      } else {
-        if (!manualData.image) throw new Error("Photo upload karein");
-        await api.post('/api/products', manualData);
-      }
-      Alert.alert("Success 🎉", "Aapka product live ho gaya hai!");
-      navigation.goBack();
-    } catch (err: any) {
-      Alert.alert("Error", err.message || "Submit nahi ho paya.");
-    } finally {
-      setLoading(false);
+          price: price,
+          stock: stock || 0,
+          isActive: true, // Backend logic ke liye safety
+        };
+      });
+
+      // API call for Bulk Insert
+      await api.post('/api/products/bulk', { products: payload });
+
+    } else {
+      // --- MANUAL MODE LOGIC ---
+      
+      // Strict Validation
+      if (!manualData.name || manualData.name.length < 3) throw new Error("Product ka naam bahut chota hai.");
+      if (!manualData.image) throw new Error("Kripya product ki photo upload karein.");
+      if (!manualData.categoryId) throw new Error("Category chunna zaroori hai.");
+      
+      const price = Number(manualData.price);
+      const stock = Number(manualData.stock);
+
+      if (isNaN(price) || price <= 0) throw new Error("Sahi Price likhein.");
+      if (isNaN(stock) || stock < 0) throw new Error("Sahi Stock likhein.");
+
+      const finalManualData = {
+        ...manualData,
+        price: price,
+        stock: stock,
+        isActive: true, // Default active for new products
+      };
+
+      // API call for Single Insert
+      await api.post('/api/products', finalManualData);
     }
-  };
+
+    // Success Feedback
+    Alert.alert(
+      "Success 🎉", 
+      mode === 'catalog' 
+        ? "Saare products inventory mein jod diye gaye hain!" 
+        : "Naya product live ho gaya hai!",
+      [{ text: "Great!", onPress: () => navigation.goBack() }]
+    );
+
+  } catch (err: any) {
+    // Error Handling
+    console.error("Submit Error:", err);
+    const errorMessage = err.response?.data?.message || err.message || "Submit nahi ho paya.";
+    Alert.alert("Rukye!", errorMessage);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const renderMasterItem = ({ item }: any) => {
     const isSelected = !!selectedItems[item.id];
@@ -269,11 +320,20 @@ export default function AddProductScreen({ navigation }: any) {
             </View>
           </View>
 
-          <Text style={styles.fieldLabel}>CATEGORY</Text>
-          <View style={styles.fullInput}>
-             {/* Simple Dropdown Logic or Picker can be added here */}
-             <TextInput placeholder="Select Category ID" onChangeText={(v) => setManualData({...manualData, categoryId: v})} />
-          </View>
+         <Text style={styles.fieldLabel}>CATEGORY</Text>
+<ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScrollManual}>
+  {categories.map((c: any) => (
+    <TouchableOpacity 
+      key={c.id} 
+      style={[styles.catPill, manualData.categoryId === c.id.toString() && styles.activeCatPill]}
+      onPress={() => setManualData({...manualData, categoryId: c.id.toString()})}
+    >
+      <Text style={[styles.catPillText, manualData.categoryId === c.id.toString() && styles.activeCatPillText]}>
+        {c.name}
+      </Text>
+    </TouchableOpacity>
+  ))}
+</ScrollView>
         </ScrollView>
       )}
 
@@ -311,6 +371,8 @@ const styles = StyleSheet.create({
   searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F1F5F9', marginHorizontal: 16, paddingHorizontal: 15, borderRadius: 14, height: 50 },
   searchInput: { flex: 1, marginLeft: 10, fontWeight: '600', color: '#1E293B' },
   catScroll: { marginTop: 12, paddingLeft: 16 },
+  catScrollManual:{marginTop: 5, marginBottom: 15,
+},
   catPill: { paddingHorizontal: 18, paddingVertical: 8, backgroundColor: '#F8FAFC', borderRadius: 20, marginRight: 8, borderWidth: 1, borderColor: '#E2E8F0' },
   activeCatPill: { backgroundColor: '#001B3A', borderColor: '#001B3A' },
   catPillText: { fontSize: 12, fontWeight: '700', color: '#64748B' },

@@ -6,7 +6,7 @@ import {
 } from "react-native";
 import Feather from 'react-native-vector-icons/Feather';
 import { useAuth } from "../../context/AuthContext";
-
+import { registerForPushNotificationsAsync } from "../../services/notificationService";
 export default function LoginScreen() {
   // नोट: सुनिश्चित करें कि आपके AuthContext में sendOtp और verifyOtp Seller के लिए कॉन्फ़िगर हैं
   const { sendOtp, verifyOtp } = useAuth() as any; 

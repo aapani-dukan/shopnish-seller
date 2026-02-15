@@ -1,6 +1,5 @@
 import axios from "axios";
-// ✅ Modular imports
-import { getAuth,getIdToken } from "@react-native-firebase/auth";
+import { getAuth } from "@react-native-firebase/auth";
 
 const api = axios.create({
   baseURL: "https://shopnish-seprate.onrender.com", 
@@ -10,23 +9,22 @@ const api = axios.create({
   },
 });
 
+// 🚀 Request Interceptor: Auto-attach Firebase Token
 api.interceptors.request.use(
-  async (config: any) => {
+  async (config) => {
     try {
       const auth = getAuth();
       const user = auth.currentUser;
       
       if (user) {
-        // 🔥 बदलाव 1: getIdToken(true) के बजाय बिना पैरामीटर के यूज़ करें 
-        // अगर बैकएंड 403 दे रहा है, तो नया टोकन लेने के लिए इसे ऐसे लिखें:
-        const token = await getIdToken(user); 
+        const token = await user.getIdToken(); 
         
         if (token) {
-          // 🔥 बदलाव 2: पुराने Axios में headers को सीधे असाइन करना बेहतर है
-          config.headers = {
-            ...config.headers,
-            Authorization: `Bearer ${token}`,
-          };
+          // ✅ Fix: Check karein ki headers exist karte hain, nahi toh naya object banayein
+          config.headers = config.headers || {};
+          
+          // Ab safely set karein
+          config.headers.Authorization = `Bearer ${token}`;
           
           if (config.data instanceof FormData) {
             config.headers["Content-Type"] = "multipart/form-data";
@@ -40,19 +38,23 @@ api.interceptors.request.use(
   },
   (error) => Promise.reject(error)
 );
-
+// 📥 Response Interceptor: Error Handling
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // 💡 अगर 403 आ रहा है, तो इसका मतलब टोकन गलत नहीं है, 
-    // बल्कि बैकएंड आपको उस डेटा का एक्सेस नहीं दे रहा।
-    if (error.response?.status === 403) {
-      console.error("🚫 [API] Forbidden: Check User Permissions/Approval");
+    const status = error.response?.status;
+
+    if (status === 403) {
+      // 💡 403 ka matlab hai token sahi hai par Permission nahi hai (e.g. Seller not approved)
+      console.error("🚫 [API] Forbidden: Access Denied / Seller Not Approved");
     }
     
-    if (error.response?.status === 401) {
-      console.log("🚫 [API] Session Expired");
+    if (status === 401) {
+      // 💡 401 ka matlab hai Session expire ho gaya ya token invalid hai
+      console.log("🚫 [API] Session Expired / Unauthorized");
+      // Yahan aap user ko logout ya login screen par bhej sakte hain
     }
+
     return Promise.reject(error);
   }
 );

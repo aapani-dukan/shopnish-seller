@@ -55,64 +55,75 @@ export default function OrdersScreen({ navigation }: any) {
 
   // Status Update Function
   const updateStatus = async (orderId: string, newStatus: string) => {
-    try {
-      await api.patch(`/suborders/${orderId}/status`, { status: newStatus });
-      Alert.alert("Success", `Order status updated to ${newStatus}`);
-      fetchOrders(); // Refresh list
-    } catch (err) {
-      Alert.alert("Error", "Status update nahi ho paya.");
-    }
-  };
+  try {
+    // URL ko /api prefix ke saath consistent rakhein
+    await api.patch(`/api/suborders/${orderId}/status`, { status: newStatus });
+    
+    // ✅ High-Class Feedback: Sound ya Haptic feedback yahan add kar sakte hain
+    Alert.alert("सफलता", `ऑर्डर अब ${statusConfig[newStatus].label} है।`);
+    fetchOrders(); 
+  } catch (err: any) {
+    const errorMsg = err.response?.data?.message || "Status update nahi ho paya.";
+    Alert.alert("Error", errorMsg);
+  }
+};
 
   const filteredOrders = filter === 'all' 
     ? orders 
     : orders.filter((o: any) => o.status === filter);
 
-  const renderOrderItem = ({ item }: any) => {
-    const config = statusConfig[item.status] || statusConfig.pending;
+// 2. Optimized renderOrderItem for multiple items
+const renderOrderItem = ({ item }: any) => {
+  const config = statusConfig[item.status] || statusConfig.pending;
+  
+  // Maan lijiye backend se orderItems ka array aa raha hai
+  const itemsCount = item.items?.length || 0;
+  const firstItemName = item.items?.[0]?.productName || item.productName || 'Order Item';
 
-    return (
-      <View style={styles.orderCard}>
-        <TouchableOpacity 
-          onPress={() => navigation.navigate('OrderDetails', { orderId: item.id })}
-          activeOpacity={0.7}
-        >
-          <View style={styles.cardHeader}>
-            <View>
-              <Text style={styles.orderNo}>#{item.subordernumber || 'ORD-000'}</Text>
-              <Text style={styles.orderDate}>
-                {format(new Date(item.createdat), 'dd MMM, hh:mm a')}
-              </Text>
-            </View>
-            <View style={[styles.statusBadge, { backgroundColor: config.bg }]}>
-              <Feather name={config.icon} size={12} color={config.color} />
-              <Text style={[styles.statusText, { color: config.color }]}>{config.label}</Text>
-            </View>
-          </View>
-
-          <View style={styles.cardBody}>
-            <Text style={styles.productName} numberOfLines={2}>
-              {item.productName || 'Items'} x {item.quantity || 1}
+  return (
+    <View style={[styles.orderCard, { borderLeftColor: config.color }]}>
+      <TouchableOpacity 
+        onPress={() => navigation.navigate('OrderDetails', { orderId: item.id })}
+        activeOpacity={0.7}
+      >
+        <View style={styles.cardHeader}>
+          <View>
+            {/* SubOrderNumber handling */}
+            <Text style={styles.orderNo}>{item.subOrderNumber || item.subordernumber}</Text>
+            <Text style={styles.orderDate}>
+              {/* null check for date */}
+              {item.createdAt || item.createdat ? format(new Date(item.createdAt || item.createdat), 'dd MMM, hh:mm a') : ''}
             </Text>
-            <View style={styles.customerRow}>
-               <Feather name="user" size={14} color="#64748b" />
-               <Text style={styles.customerInfo}>{item.customerName || 'Guest Customer'}</Text>
-            </View>
           </View>
+          <View style={[styles.statusBadge, { backgroundColor: config.bg }]}>
+            <Feather name={config.icon} size={12} color={config.color} />
+            <Text style={[styles.statusText, { color: config.color }]}>{config.label}</Text>
+          </View>
+        </View>
 
-          <View style={styles.cardFooter}>
-            <Text style={styles.orderTotal}>₹{Number(item.total).toFixed(2)}</Text>
-            
-            {/* Quick Actions based on status */}
-            <View style={styles.actionRow}>
-              {item.status === 'pending' && (
-                <TouchableOpacity 
-                  style={[styles.miniBtn, { backgroundColor: '#1e40af' }]}
-                  onPress={() => updateStatus(item.id, 'accepted')}
-                >
-                  <Text style={styles.miniBtnText}>Accept</Text>
-                </TouchableOpacity>
-              )}
+        <View style={styles.cardBody}>
+          <Text style={styles.productName} numberOfLines={2}>
+            {firstItemName} {itemsCount > 1 ? `+ ${itemsCount - 1} more items` : ''}
+          </Text>
+          <View style={styles.customerRow}>
+             <Feather name="map-pin" size={14} color="#64748b" />
+             <Text style={styles.customerInfo}>{item.deliveryCity || 'Local Delivery'}</Text>
+          </View>
+        </View>
+
+        {/* Action Buttons Logic */}
+        <View style={styles.cardFooter}>
+          <Text style={styles.orderTotal}>₹{Number(item.total).toLocaleString()}</Text>
+          
+          <View style={styles.actionRow}>
+            {item.status === 'pending' && (
+              <TouchableOpacity 
+                style={[styles.miniBtn, { backgroundColor: '#10b981' }]} // Accept green behtar hai
+                onPress={() => updateStatus(item.id, 'accepted')}
+              >
+                <Text style={styles.miniBtnText}>Accept</Text>
+              </TouchableOpacity>
+            )}
               {item.status === 'accepted' && (
                 <TouchableOpacity 
                   style={[styles.miniBtn, { backgroundColor: '#8b5cf6' }]}

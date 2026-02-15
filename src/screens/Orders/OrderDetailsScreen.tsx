@@ -20,28 +20,34 @@ export default function OrderDetailsScreen({ route, navigation }: any) {
   }, [orderId]);
 
   const fetchOrderDetails = async () => {
-    try {
-      const res = await api.get(`/suborders/${orderId}/details`);
-      setOrder(res.data.subOrder);
-    } catch (err) {
-      Alert.alert("Error", "Details load nahi ho payi.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+    // ✅ URL ko /api ke saath consistent rakhein
+    const res = await api.get(`/api/suborders/${orderId}/details`);
+    setOrder(res.data.subOrder);
+  } catch (err) {
+    Alert.alert("Error", "Details load nahi ho payi.");
+  } finally {
+    setLoading(false);
+  }
+};
 
-  const updateStatus = async (newStatus: string) => {
-    setUpdating(true);
-    try {
-      await api.patch(`/suborders/${orderId}/status`, { status: newStatus });
-      Alert.alert("Status Updated", `Order ab ${newStatus} status mein hai.`);
-      fetchOrderDetails();
-    } catch (err) {
-      Alert.alert("Error", "Update fail ho gaya.");
-    } finally {
-      setUpdating(false);
-    }
-  };
+ // 2. Status Update (Success Feedback)
+const updateStatus = async (newStatus: string) => {
+  setUpdating(true);
+  try {
+    await api.patch(`/api/suborders/${orderId}/status`, { status: newStatus });
+    
+    // Status ke hisaab se Hindi message (High-Class touch)
+    const displayStatus = newStatus === 'accepted' ? 'स्वीकार' : 'अपडेट';
+    Alert.alert("सफलता", `ऑर्डर अब ${displayStatus} हो गया है।`);
+    
+    fetchOrderDetails();
+  } catch (err) {
+    Alert.alert("Error", "Update fail ho gaya.");
+  } finally {
+    setUpdating(false);
+  }
+};
 
   const openMap = (address: string) => {
     const url = Platform.select({
@@ -71,24 +77,44 @@ export default function OrderDetailsScreen({ route, navigation }: any) {
            <Text style={styles.subText}>Sub-Order: #{order?.subordernumber}</Text>
         </View>
 
-        {/* Action Buttons Section */}
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Customer & Delivery</Text>
-          <View style={styles.customerRow}>
-            <View style={styles.customerInfo}>
-              <Text style={styles.customerName}>{order?.customerName || 'Customer'}</Text>
-              <Text style={styles.customerPhone}>{order?.customerPhone || '+91 00000 00000'}</Text>
-            </View>
-            <View style={styles.iconRow}>
-              <TouchableOpacity style={[styles.circleBtn, { backgroundColor: '#10b981' }]} onPress={() => Linking.openURL(`tel:${order?.customerPhone}`)}>
-                <Feather name="phone" size={20} color="#fff" />
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.circleBtn, { backgroundColor: '#3b82f6' }]} onPress={() => Linking.openURL(`whatsapp://send?phone=91${order?.customerPhone}`)}>
-                <Feather name="message-circle" size={20} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          </View>
+       {/* Action Buttons Section */}
+<View style={styles.card}>
+  <Text style={styles.sectionTitle}>Customer & Delivery</Text>
+  <View style={styles.customerRow}>
+    <View style={styles.customerInfo}>
+      <Text style={styles.customerName}>{order?.customerName || 'Customer'}</Text>
+      <Text style={styles.customerPhone}>{order?.customerPhone || '+91 00000 00000'}</Text>
+    </View>
+    <View style={styles.iconRow}>
+      {/* 📞 Call Button */}
+      <TouchableOpacity 
+        style={[styles.circleBtn, { backgroundColor: '#10b981' }]} 
+        onPress={() => Linking.openURL(`tel:${order?.customerPhone}`)}
+      >
+        <Feather name="phone" size={20} color="#fff" />
+      </TouchableOpacity>
+
+      {/* 💬 WhatsApp Button with Pre-filled Message */}
+      <TouchableOpacity 
+        style={[styles.circleBtn, { backgroundColor: '#3b82f6' }]} 
+        onPress={() => {
+          const customerPhone = order?.customerPhone || '';
+          const orderNum = order?.subOrderNumber || order?.subordernumber || 'N/A';
+          const customerName = order?.customerName || 'Customer';
           
+          // Professional Message Logic
+          const msg = `नमस्ते ${customerName}, मैं Shopnish से आपका स्टोर पार्टनर बोल रहा हूँ। आपके ऑर्डर #${orderNum} के बारे में कुछ जानकारी चाहिए थी।`;
+          const url = `whatsapp://send?phone=91${customerPhone}&text=${encodeURIComponent(msg)}`;
+          
+          Linking.openURL(url).catch(() => {
+            Alert.alert("Error", "WhatsApp आपके फोन में इंस्टॉल नहीं है।");
+          });
+        }}
+      >
+        <Feather name="message-circle" size={20} color="#fff" />
+      </TouchableOpacity>
+    </View>
+  </View>
           <TouchableOpacity 
             style={styles.addressBox} 
             onPress={() => openMap(`${order?.deliveryAddress?.addressLine1}, ${order?.deliveryAddress?.city}`)}
@@ -130,7 +156,7 @@ export default function OrderDetailsScreen({ route, navigation }: any) {
 
         {/* Order Info */}
         <View style={[styles.card, { backgroundColor: '#f8fafc', borderStyle: 'dashed', borderWidth: 1, borderColor: '#cbd5e1' }]}>
-            <Text style={styles.infoText}>Placed on: {format(new Date(order?.createdat), 'PPPP, hh:mm a')}</Text>
+            <Text style={styles.infoText}>Placed on: {format(new Date(order?.cretedAt), 'PPPP, hh:mm a')}</Text>
             <Text style={styles.infoText}>Payment Method: {order?.paymentMethod || 'Online'}</Text>
         </View>
 

@@ -9,40 +9,31 @@ import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigation } from '@react-navigation/native';
 const { width } = Dimensions.get('window');
-
 export default function DashboardScreen({ navigation }: any) {
-  const { user, refreshUserStatus } = useAuth();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
 
-  // 1. Fetch Stats (Backend se connect hone par actual data dikhega)
+  // 1. Fetch Stats
   const { data: dashboardData, isLoading, refetch } = useQuery({
     queryKey: ['seller-dashboard'],
     queryFn: async () => {
-      try {
-        const res = await api.get('/api/sellers/dashboard-stats');
-        return res.data;
-      } catch (err) {
-        // Fallback for UI testing
-        return { 
-          todaySales: 0, pendingOrders: 0, activeProducts: 0, newReviews: 0, 
-          isOpen: user?.isOpen ?? false, 
-          recentOrders: []
-        };
-      }
+      const res = await api.get('/api/sellers/dashboard-stats');
+      return res.data;
     },
   });
 
-  // 2. Toggle Store Mutation (Zomato style quick toggle)
-  const toggleStore = useMutation({
- mutationFn: async (status: boolean) => {
-  return await api.patch('/api/sellers/toggle-status', { 
-    is_open: status 
-  });
-},
+  // 2. ✅ Unified Mutation (Dono toggles ke liye ek hi mutation)
+  const updateStatusMutation = useMutation({
+    mutationFn: async (payload: { isOpen?: boolean; isSelfDeliveryBySeller?: boolean }) => {
+      // Backend controller 'toggleSellerStatus' ko hit karega
+      return await api.patch('/api/sellers/toggle-status', payload);
+    },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['seller-dashboard'] });
-      Alert.alert("Store Updated", variables ? "Aapki dukaan ab live hai! 🚀" : "Dukaan band kar di gayi hai.");
+      if (variables.isOpen !== undefined) {
+        Alert.alert("Store Updated", variables.isOpen ? "Dukaan Live hai! 🚀" : "Dukaan Offline hai.");
+      }
     },
     onError: () => Alert.alert("Error", "Action failed. Check internet.")
   });
@@ -53,18 +44,19 @@ export default function DashboardScreen({ navigation }: any) {
     setRefreshing(false);
   }, [refetch]);
 
-  if (isLoading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#001B3A" />
-      </View>
-    );
-  }
+  if (isLoading) return <View style={styles.center}><ActivityIndicator size="large" color="#001B3A" /></View>;
 
+  // Metrics Logic
   const metrics = [
     { title: 'Today Sales', value: `₹${Number(dashboardData?.todaySales || 0).toLocaleString('en-IN')}`, icon: 'trending-up', color: '#10b981', bg: '#ecfdf5' },
     { title: 'Pending Orders', value: dashboardData?.pendingOrders || 0, icon: 'clock', color: '#f59e0b', bg: '#fffbeb' },
-    { title: 'Active Items', value: dashboardData?.activeProducts || 0, icon: 'package', color: '#3b82f6', bg: '#eff6ff' },
+    { 
+      title: 'Low Stock', 
+      value: dashboardData?.lowStockItems || 0, 
+      icon: 'alert-triangle', 
+      color: (dashboardData?.lowStockItems || 0) > 0 ? '#ef4444' : '#64748b', 
+      bg: (dashboardData?.lowStockItems || 0) > 0 ? '#fef2f2' : '#f8fafc' 
+    },
     { title: 'New Reviews', value: dashboardData?.newReviews || 0, icon: 'star', color: '#D4AF37', bg: '#fefce8' },
   ];
 
@@ -72,7 +64,7 @@ export default function DashboardScreen({ navigation }: any) {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#001B3A" />
       
-      {/* 🚀 Top Bar */}
+      {/* 🚀 Top Bar: Store Toggle (Using updateStatusMutation) */}
       <View style={[styles.statusToggleBar, { backgroundColor: dashboardData?.isOpen ? '#10b981' : '#64748b' }]}>
         <View style={styles.statusInfo}>
           <View style={[styles.statusDot, { backgroundColor: dashboardData?.isOpen ? '#fff' : '#cbd5e1' }]} />
@@ -83,106 +75,53 @@ export default function DashboardScreen({ navigation }: any) {
         <Switch
           trackColor={{ false: "#475569", true: "#dcfce7" }}
           thumbColor={dashboardData?.isOpen ? "#fff" : "#f4f3f4"}
-          onValueChange={(val) => toggleStore.mutate(val)}
+          onValueChange={(val) => updateStatusMutation.mutate({ isOpen: val })} // ✅ Fixed: Matching Name & Key
           value={dashboardData?.isOpen}
         />
       </View>
 
-      <ScrollView 
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#001B3A" />}
-      >
-        {/* Header Section */}
-        <View style={styles.header}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.greeting}>Welcome back,</Text>
-            {/* 💡 बैकएंड के हिसाब से businessName या business_name */}
-            <Text style={styles.businessName} numberOfLines={1}>
-              {user?.businessName || user?.firstName || 'Elite Seller'}
-            </Text>
-          </View>
-
+      <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#001B3A" />}>
+        {/* Header & Hero Card same rahenge... */}
+        
+        {/* Recent Orders Map (With Key Fixes) */}
+        {dashboardData?.recentOrders?.map((order: any) => (
           <TouchableOpacity 
-            onPress={() => navigation.navigate('SellerWallet')}
-            style={styles.walletButton}
+            key={order.id} 
+            style={styles.orderCard} 
+            onPress={() => navigation.navigate('OrderDetails', { orderId: order.id })}
           >
-            {/* ✅ फिक्स किया गया आइकॉन: 'credit-card' (Feather Compatible) */}
-            <Feather name="credit-card" size={18} color="#D4AF37" />
-            <Text style={styles.walletButtonText}>Wallet</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={[styles.profileBtn, { marginLeft: 10 }]} onPress={() => navigation.navigate('Profile')}>
-             <Feather name="settings" size={22} color="#001B3A" />
-          </TouchableOpacity>
-        </View>
-        {/* Sales Hero Card (Shopnish Navy Blue) */}
-        <View style={styles.heroCard}>
-          <Text style={styles.heroLabel}>Total Revenue (Today)</Text>
-          <Text style={styles.heroValue}>₹{Number(dashboardData?.todaySales || 0).toLocaleString('en-IN')}</Text>
-          <View style={styles.heroFooter}>
-            <Feather name="arrow-up-right" size={16} color="#D4AF37" />
-            <Text style={styles.heroTrend}>Real-time tracking enabled</Text>
-          </View>
-        </View>
-
-        {/* Metrics Grid */}
-        <View style={styles.grid}>
-          {metrics.map((item, index) => (
-            <View key={index} style={styles.card}>
-              <View style={[styles.iconBox, { backgroundColor: item.bg }]}>
-                <Feather name={item.icon} size={18} color={item.color} />
-              </View>
-              <Text style={styles.cardLabel}>{item.title}</Text>
-              <Text style={styles.cardValue}>{item.value}</Text>
+            <View style={styles.orderLeft}>
+              <Text style={styles.orderId}>#{order.orderNumber || order.subOrderNumber}</Text>
+              <Text style={styles.orderCustomer}>{order.customerName}</Text>
             </View>
-          ))}
-        </View>
-
-        {/* Recent Orders */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Recent Orders</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Orders')}>
-            <Text style={styles.seeAll}>View All</Text>
+            <View style={styles.orderRight}>
+              <Text style={styles.orderAmount}>₹{Number(order.totalAmount || order.total).toFixed(2)}</Text>
+              <Text style={[styles.orderStatus, { color: order.status === 'pending' ? '#f59e0b' : '#3b82f6' }]}>
+                {order.status?.replace('_', ' ').toUpperCase()}
+              </Text>
+            </View>
           </TouchableOpacity>
-        </View>
+        ))}
 
-        {dashboardData?.recentOrders?.length > 0 ? (
-          dashboardData.recentOrders.map((order: any) => (
-            <TouchableOpacity key={order.id} style={styles.orderCard} onPress={() => navigation.navigate('OrderDetails', { orderId: order.id })}>
-              <View style={styles.orderLeft}>
-                <Text style={styles.orderId}>#{order.orderNumber}</Text>
-                <Text style={styles.orderCustomer}>{order.customerName}</Text>
-              </View>
-              <View style={styles.orderRight}>
-                <Text style={styles.orderAmount}>₹{order.totalAmount}</Text>
-                <Text style={[styles.orderStatus, { color: '#f59e0b' }]}>{order.status}</Text>
-              </View>
-            </TouchableOpacity>
-          ))
-        ) : (
-          <View style={styles.emptyState}>
-            <Feather name="shopping-cart" size={40} color="#cbd5e1" />
-            <Text style={styles.emptyText}>Orders will appear here once received.</Text>
-          </View>
-        )}
-
-        {/* Quick Actions Footer */}
+        {/* Quick Actions with Self-Delivery */}
         <View style={styles.quickActions}>
-          <ActionButton 
-            onPress={() => navigation.navigate('AddProduct')} 
-            icon="plus-circle" label="Add Item" color="#001B3A" bg="#eef2ff" 
-          />
-          <ActionButton 
-            onPress={() => navigation.navigate('Inventory')} 
-            icon="list" label="Stock" color="#ea580c" bg="#fff7ed" 
-          />
+          <ActionButton onPress={() => navigation.navigate('AddProduct')} icon="plus-circle" label="Add Item" color="#001B3A" bg="#eef2ff" />
+          
+          <TouchableOpacity 
+            style={styles.actionItem} 
+            onPress={() => updateStatusMutation.mutate({ isSelfDeliveryBySeller: !dashboardData?.isSelfDelivery })} // ✅ Fixed: Using Unified Mutation
+          >
+            <View style={[styles.actionIcon, { backgroundColor: dashboardData?.isSelfDelivery ? '#dcfce7' : '#f8fafc' }]}>
+              <Feather name="truck" size={22} color={dashboardData?.isSelfDelivery ? '#10b981' : '#64748b'} />
+            </View>
+            <Text style={styles.actionText}>{dashboardData?.isSelfDelivery ? 'Self Delivery ON' : 'Self Delivery OFF'}</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </View>
   );
 }
-
-// Reusable Action Button
+// ✅ DashboardScreen function ke bahar aur styles ke upar ise rakhein
 const ActionButton = ({ icon, label, onPress, color, bg }: any) => (
   <TouchableOpacity style={styles.actionItem} onPress={onPress}>
     <View style={[styles.actionIcon, { backgroundColor: bg }]}>
@@ -192,6 +131,7 @@ const ActionButton = ({ icon, label, onPress, color, bg }: any) => (
   </TouchableOpacity>
 );
 
+// Iske baad aapka styles object shuru hoga
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },

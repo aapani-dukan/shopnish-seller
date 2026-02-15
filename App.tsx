@@ -9,7 +9,15 @@ import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { queryClient } from './src/lib/queryClient';
 import AppNavigator from './src/navigation/AppNavigator';
 import { LogBox } from 'react-native';
+import * as Notifications from 'expo-notifications';
 
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true, // 👈 Isse khule app mein bhi banner dikhega
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 LogBox.ignoreLogs([
   'This method is deprecated (as well as all React Native Firebase namespaced API)',
   'Method called was `getIdToken`'

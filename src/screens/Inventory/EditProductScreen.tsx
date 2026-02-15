@@ -13,45 +13,57 @@ export default function EditProductScreen({ route, navigation }: any) {
   const [saving, setSaving] = useState(false);
   const [categories, setCategories] = useState([]);
   const [formData, setFormData] = useState<any>(null);
-
+  const [initialPrice, setInitialPrice] = useState<string>('');
   // 1. Fetch Data (Product + Categories)
-  const fetchData = useCallback(async () => {
-    try {
-      const [prodRes, catRes] = await Promise.all([
-        api.get(`/api/products/${productId}`),
-        api.get('/api/categories/all')
-      ]);
-      setFormData(prodRes.data.product);
-      setCategories(catRes.data.categories || []);
-    } catch (err) {
-      Alert.alert("Error", "Data load karne mein dikkat aayi.");
-    } finally {
-      setLoading(false);
-    }
-  }, [productId]);
+  // 1. Upar formData ke sath ek originalPrice state bhi rakhein
 
-  useEffect(() => { fetchData(); }, [fetchData]);
 
-  // 2. Submit Logic
-  const handleUpdate = async () => {
-    if (!formData.name || !formData.price) {
-      Alert.alert("Rukiye!", "Naam aur Price bharna zaroori hai.");
-      return;
-    }
+// fetchData mein price set karein
+const fetchData = useCallback(async () => {
+  try {
+    const [prodRes, catRes] = await Promise.all([
+      api.get(`/api/products/${productId}`),
+      api.get('/api/categories/all')
+    ]);
+    const product = prodRes.data.product;
+    setFormData(product);
+    setInitialPrice(String(product.price)); // Save initial price
+    setCategories(catRes.data.categories || []);
+  } catch (err) {
+    Alert.alert("Error", "Data load nahi ho paya.");
+  } finally {
+    setLoading(false);
+  }
+}, [productId]);
 
-    setSaving(true);
-    try {
-      await api.put(`/api/products/${productId}`, formData);
-      Alert.alert("Success", "Product update ho gaya!", [
-        { text: "OK", onPress: () => navigation.goBack() }
-      ]);
-    } catch (err) {
-      Alert.alert("Update Failed", "Server par data save nahi ho paya.");
-    } finally {
-      setSaving(false);
-    }
-  };
+// 2. Updated Handle Update Logic
+const handleUpdate = async () => {
+  if (!formData.name || !formData.price) {
+    Alert.alert("Rukiye!", "Naam aur Price zaroori hain.");
+    return;
+  }
 
+  // Versioning Logic Check
+  let updatePayload = { ...formData };
+  if (String(formData.price) !== initialPrice) {
+    // Agar price badla hai, toh reason puchein (Optional par Pro lagta hai)
+    updatePayload.changeReason = "Price updated via Seller App";
+  }
+
+  setSaving(true);
+  try {
+    // Backend service ko call karein (Jo humne ProductService mein banaya tha)
+    await api.patch(`/api/products/${productId}`, updatePayload);
+    
+    Alert.alert("Success ✅", "Product update ho gaya aur history save ho gayi!", [
+      { text: "Mast!", onPress: () => navigation.goBack() }
+    ]);
+  } catch (err) {
+    Alert.alert("Update Failed", "Server error. Check inventory.");
+  } finally {
+    setSaving(false);
+  }
+};
   if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#1e40af" /></View>;
 
   return (
@@ -105,18 +117,35 @@ export default function EditProductScreen({ route, navigation }: any) {
             value={formData.description}
             onChangeText={(v) => setFormData({...formData, description: v})}
           />
-
+<View style={{ flex: 1, marginRight: 10 }}>
+  <Text style={styles.label}>Price (₹)</Text>
+  <TextInput 
+    style={[
+      styles.input, 
+      String(formData.price) !== initialPrice && { borderColor: '#1e40af', borderWidth: 2 }
+    ]}
+    keyboardType="numeric"
+    value={String(formData.price)}
+    onChangeText={(v) => setFormData({...formData, price: v})}
+  />
+  {/* Price Change Indicator */}
+  {String(formData.price) !== initialPrice && (
+    <Text style={{ fontSize: 10, color: '#1e40af', marginTop: -15, marginBottom: 10 }}>
+      Price change detect hua hai (Versioning ON)
+    </Text>
+  )}
+</View>
           {/* Status Toggle */}
           <View style={styles.statusBox}>
             <View>
               <Text style={styles.statusTitle}>Dukaan mein dikhayein?</Text>
-              <Text style={styles.statusSub}>{formData.isactive ? 'Abhi Customer ko dikh raha hai' : 'Abhi chupa hua hai'}</Text>
+              <Text style={styles.statusSub}>{formData.isActive ? 'Abhi Customer ko dikh raha hai' : 'Abhi chupa hua hai'}</Text>
             </View>
             <TouchableOpacity 
-              onPress={() => setFormData({...formData, isactive: !formData.isactive})}
-              style={[styles.toggle, { backgroundColor: formData.isactive ? '#10b981' : '#cbd5e1' }]}
+              onPress={() => setFormData({...formData, isActive: !formData.isActive})}
+              style={[styles.toggle, { backgroundColor: formData.isActive ? '#10b981' : '#cbd5e1' }]}
             >
-              <View style={[styles.toggleCircle, { alignSelf: formData.isactive ? 'flex-end' : 'flex-start' }]} />
+              <View style={[styles.toggleCircle, { alignSelf: formData.isActive ? 'flex-end' : 'flex-start' }]} />
             </TouchableOpacity>
           </View>
 
