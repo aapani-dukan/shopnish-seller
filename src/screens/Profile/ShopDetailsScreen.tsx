@@ -25,6 +25,24 @@ import {
 } from 'lucide-react-native';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+const InputField = ({ label, icon: Icon, value, onChangeText, placeholder, multiline = false, keyboardType = 'default' }: any) => (
+    <View style={styles.inputContainer}>
+      <Text style={styles.label}>{label}</Text>
+      <View style={[styles.inputWrapper, multiline && styles.textAreaWrapper]}>
+        <Icon color="#64748b" size={20} style={styles.inputIcon} />
+        <TextInput
+          style={[styles.input, multiline && styles.textArea]}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor="#cbd5e1"
+          multiline={multiline}
+          keyboardType={keyboardType}
+          textAlignVertical={multiline ? 'top' : 'center'}
+        />
+      </View>
+    </View>
+  );
 
 const ShopDetailsScreen = ({ navigation }: any) => {
   const { user } = useAuth();
@@ -35,8 +53,11 @@ const ShopDetailsScreen = ({ navigation }: any) => {
   const [pincodeInput, setPincodeInput] = useState('');
   const [deliveryPincodes, setDeliveryPincodes] = useState<string[]>([]);
   const [isAutoAccept, setIsAutoAccept] = useState(false);
-
+// --- States Section mein ye add karein ---
+const [isDistanceBased, setIsDistanceBased] = useState(false); // Ye error solve karega
+const [radius, setRadius] = useState(''); // Radius store karne ke liye
   const [shopInfo, setShopInfo] = useState({
+    id:null,
     businessName: '',
     description: '',
     businessAddress: '',
@@ -47,24 +68,30 @@ const ShopDetailsScreen = ({ navigation }: any) => {
 
   // 1. Load Data on Mount
   useEffect(() => {
-    if (user) {
-      setShopInfo({
-        businessName: user.businessName || '',
-        description: user.description || '',
-        businessAddress: user.businessAddress || '',
-        pincode: user.pincode || '',
-        openTime: user.openTime || '09:00 AM',
-        closeTime: user.closeTime || '10:00 PM',
-      });
-      
-      if (user.deliveryPincodes) {
-        setDeliveryPincodes(user.deliveryPincodes);
-      }
-      
-      setIsAutoAccept(user.isAutoAccept || false);
-      setInitialLoading(false);
+  if (user && user.sellerProfile) {
+    const profile = user.sellerProfile; // 👈 Profile shortcut
+    
+    setShopInfo({
+      id: profile.id, // ✅ Ye 11 set karega
+      businessName: profile.businessName || '',
+      description: profile.description || '',
+      businessAddress: profile.businessAddress || '',
+      pincode: profile.pincode || '',
+      openTime: '09:00 AM', // Agar ye DB mein nahi hai toh default rahega
+      closeTime: '10:00 PM',
+    });
+    setIsDistanceBased(profile.isDistanceBasedDelivery || false);
+    setRadius(profile.deliveryRadius ? String(profile.deliveryRadius) : '');
+    
+    // ✅ Logs ke mutabiq profile.deliveryPincodes mein array hai
+    if (profile.deliveryPincodes) {
+      setDeliveryPincodes(profile.deliveryPincodes);
     }
-  }, [user]);
+    
+    setIsAutoAccept(profile.isAutoAccept || false);
+    setInitialLoading(false);
+  }
+}, [user]);
 
   // 2. Pincode Handlers
   const addPincode = () => {
@@ -87,51 +114,49 @@ const ShopDetailsScreen = ({ navigation }: any) => {
 
   // 3. Save Handler
   const handleSave = async () => {
-    if (!shopInfo.businessName || !shopInfo.pincode) {
-      Alert.alert("Error", "Business Name aur Pincode zaroori hain.");
-      return;
-    }
+  setLoading(true);
+ try {
+    const payload = {
+      ...shopInfo,
+      deliveryPincodes: deliveryPincodes, 
+      isDistanceBasedDelivery: isDistanceBased, // 🚩 Sahi Mapping
+      deliveryRadius: isDistanceBased ? Number(radius) : null,
+      isAutoAccept,
+    };
 
-    setLoading(true);
-    try {
-      const payload = {
-        ...shopInfo,
-        deliveryPincodes,
-        isAutoAccept,
-      };
-
-      await api.patch(`/api/sellers/update-profile/${user.id}`, payload);
+    // 🚩 AB ID BHEJNE KI ZAROORAT NAHI!
+    // /api/sellers/35 ki jagah ye likhein:
+    await api.patch(`/api/sellers/profile/me`, payload);
+    
+    Alert.alert("Success ✅", "Shop details updated successfully!", [
+      { text: "Congratulation!", onPress: () => navigation.goBack() }
+    ]);
+  } catch (error: any) {
+      if (error.response?.data?.errors) {
+      const serverErrors = error.response.data.errors;
       
-      Alert.alert("Success ✅", "Shop details updated successfully!", [
-        { text: "Mast!", onPress: () => navigation.goBack() }
-      ]);
-    } catch (error: any) {
+      // Agar description mein error hai
+      if (serverErrors.description) {
+        Alert.alert("Dhyan Dein ⚠️", `Description: ${serverErrors.description[0]}`);
+      } 
+      // Agar pincode mein error hai
+      else if (serverErrors.pincode) {
+        Alert.alert("Dhyan Dein ⚠️", "Pincode sahi format mein nahi hai.");
+      }
+      else {
+        Alert.alert("Validation Error", "Kripya saari details sahi se bharein.");
+      }
+    } else {
+      // General error agar server hi down ho
       Alert.alert("Error", error.response?.data?.message || "Update fail ho gaya.");
-    } finally {
-      setLoading(false);
     }
-  };
+  } finally {
+    setLoading(false);
+  }
+};
 
   // 4. Reusable Input Component
-  const InputField = ({ label, icon: Icon, value, onChangeText, placeholder, multiline = false, keyboardType = 'default' }: any) => (
-    <View style={styles.inputContainer}>
-      <Text style={styles.label}>{label}</Text>
-      <View style={[styles.inputWrapper, multiline && styles.textAreaWrapper]}>
-        <Icon color="#64748b" size={20} style={styles.inputIcon} />
-        <TextInput
-          style={[styles.input, multiline && styles.textArea]}
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={placeholder}
-          placeholderTextColor="#cbd5e1"
-          multiline={multiline}
-          keyboardType={keyboardType}
-          textAlignVertical={multiline ? 'top' : 'center'}
-        />
-      </View>
-    </View>
-  );
-
+  
   if (initialLoading) {
     return (
       <View style={styles.center}>
@@ -226,7 +251,35 @@ const ShopDetailsScreen = ({ navigation }: any) => {
               ))}
             </View>
           </View>
+{/* DELIVERY METHOD SELECTION */}
+<View style={styles.section}>
+  <Text style={styles.sectionTitle}>Delivery Strategy</Text>
+  
+  <View style={styles.settingCard}>
+    <View style={{ flex: 1 }}>
+      <Text style={styles.settingTitle}>Radius Based Delivery</Text>
+      <Text style={styles.settingSub}>Distance ke hisaab se delivery karein</Text>
+    </View>
+    <Switch 
+      value={isDistanceBased} // Ye state aapko banani hogi
+      onValueChange={(val) => setIsDistanceBased(val)}
+      trackColor={{ false: '#cbd5e1', true: '#10b981' }}
+    />
+  </View>
 
+  {isDistanceBased ? (
+    <InputField 
+      label="DELIVERY RADIUS (IN KM)" 
+      icon={MapPin} 
+      value={radius} // Ye state bhi banani hogi
+      onChangeText={setRadius}
+      placeholder="e.g. 5"
+      keyboardType="numeric"
+    />
+  ) : (
+    <Text style={styles.infoText}>Abhi aap Pincode ke aadhar par delivery kar rahe hain.</Text>
+  )}
+</View>
           {/* 4. TIMINGS */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Operating Hours</Text>
@@ -343,6 +396,13 @@ const styles = StyleSheet.create({
     borderColor: '#bfdbfe'
   },
   tagText: { color: '#1e40af', fontWeight: '800', fontSize: 14 },
+  infoText: {
+    fontSize: 13,
+    color: '#64748b',
+    marginTop: 10,
+    fontStyle: 'italic',
+    paddingHorizontal: 4,
+  },
   settingCard: { 
     flexDirection: 'row', 
     justifyContent: 'space-between', 

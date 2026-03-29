@@ -9,7 +9,7 @@ import { useAuth } from "../../context/AuthContext";
 import { registerForPushNotificationsAsync } from "../../services/notificationService";
 export default function LoginScreen() {
   // नोट: सुनिश्चित करें कि आपके AuthContext में sendOtp और verifyOtp Seller के लिए कॉन्फ़िगर हैं
-  const { sendOtp, verifyOtp } = useAuth() as any; 
+  const { sendOtp, verifyOtp,user } = useAuth() as any; 
 
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otpCode, setOtpCode] = useState("");
@@ -53,15 +53,28 @@ export default function LoginScreen() {
     if (otpCode.length < 6) return;
     setIsLoading(true);
     try {
-      await verifyOtp(otpCode);
+     const loggedInUser = await verifyOtp(otpCode);
       // सफलता के बाद AuthContext अपने आप redirect कर देगा
+      // 2. 🔥 TRING TRING: Token Register karein
+      // Agar loggedInUser return ho raha hai toh uska ID use karein, 
+      // warna AuthContext se jo user milega wo use hoga
+      const userId = loggedInUser?.id || user?.id;
+      if (userId) {
+        await registerForPushNotificationsAsync(userId);
+        console.log("✅ Seller registered for notifications");
+      }
     } catch (err: any) {
       Alert.alert("Verification Failed", "गलत OTP, कृपया दोबारा जांचें।");
     } finally {
       setIsLoading(false);
     }
   };
-
+// Ek safety check: Agar user pehle se logged in hai par token register nahi hua
+  useEffect(() => {
+    if (user?.id) {
+      registerForPushNotificationsAsync(user.id);
+    }
+  }, [user?.id]);
   return (
     <KeyboardAvoidingView 
       behavior={Platform.OS === "ios" ? "padding" : "height"} 

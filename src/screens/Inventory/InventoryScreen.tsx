@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, Text, FlatList, StyleSheet, Image, 
-  TouchableOpacity, TextInput, ActivityIndicator, Alert, RefreshControl 
+  TouchableOpacity, TextInput, ActivityIndicator, Alert, RefreshControl,Dimensions 
 } from 'react-native';
 import Feather from 'react-native-vector-icons/Feather';
 import api from '../../services/api';
-
+const BASE_URL = 'https://shopnish-seprate.onrender.com';
+const { width } = Dimensions.get('window');
 export default function InventoryScreen({ navigation }: any) {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -100,49 +101,55 @@ const toggleStock = async (id: string, currentName: string, currentStock: number
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 // renderProduct function ke andar ye badlav karein:
-
 const renderProduct = ({ item }: any) => {
   const isOutOfStock = item.stock <= 0;
-  const isLowStock = item.stock > 0 && item.stock <= 5; // ✅ High-Class Alert
-  
+  const isLowStock = item.stock > 0 && item.stock <= 5;
   const statusColor = item.approvalStatus === 'approved' ? '#10b981' : '#f59e0b';
-  // Stock text color logic
   const stockColor = isOutOfStock ? '#ef4444' : isLowStock ? '#f59e0b' : '#10b981';
+
+  // URL cleaning logic
+  const imageUri = item.image && item.image.startsWith('http') && !item.image.includes('placehold')
+    ? item.image.trim().replace(/\(/g, '%28').replace(/\)/g, '%29').replace(/ /g, '%20')
+    : null;
 
   return (
     <View style={[styles.card, isOutOfStock && { backgroundColor: '#fdf2f2' }]}>
-      <View style={styles.imageContainer}>
-        <Image source={{ uri: item.image }} style={styles.img} />
-        {isOutOfStock && (
-          <View style={styles.outOfStockOverlay}>
-            <Text style={styles.outOfStockText}>SOLD OUT</Text>
-          </View>
-        )}
-      </View>
-      
+     <View style={styles.imageContainer}>
+  {item.image ? (
+    <Image 
+      key={`prod-img-${item.id}`}
+      source={{ uri: item.image }} 
+      style={styles.prodImage} 
+      resizeMode="cover"
+      onLoad={() => console.log(`✅ PHOTO RENDERED: ${item.name}`)}
+      onError={() => console.log(`❌ PHOTO FAILED: ${item.name}`)}
+    />
+  ) : (
+    <View style={styles.fallbackView}>
+      {/* Humne Feather hata kar Material icon dala hai check karne ke liye */}
+      <Text style={{fontSize: 10, color: '#94a3b8'}}>No </Text>
+    </View>
+  )}
+
+  {isOutOfStock && (
+    <View style={styles.outOfStockOverlay}>
+      <Text style={styles.outOfStockText}>SOLD OUT</Text>
+    </View>
+  )}
+</View>
       <View style={styles.info}>
         <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
         <Text style={styles.price}>₹{Number(item.price).toLocaleString()}</Text>
-        
         <View style={styles.stockRow}>
-          {/* ✅ Improved Stock Badge */}
-          <View style={[styles.modernBadge, { borderColor: stockColor + '40' }]}>
-            <View style={[styles.dot, { backgroundColor: stockColor }]} />
-            <Text style={[styles.stockText, { color: '#1e293b' }]}>
-              {isOutOfStock ? 'Out of Stock' : `${item.stock} Units`}
-              {isLowStock && ' (Low)'} 
-            </Text>
-          </View>
-
-          <View style={[styles.statusBadgeModern, { backgroundColor: statusColor + '15' }]}>
-            <Text style={[styles.statusTextModern, { color: statusColor }]}>
-              {item.approvalStatus === 'approved' ? 'LIVE' : 'PENDING'}
-            </Text>
-          </View>
+           <View style={[styles.modernBadge, { borderColor: stockColor + '40' }]}>
+              <View style={[styles.dot, { backgroundColor: stockColor }]} />
+              <Text style={styles.stockText}>{isOutOfStock ? 'Out of Stock' : `${item.stock} Units`}</Text>
+           </View>
         </View>
       </View>
 
       <View style={styles.actionsColumn}>
+
         {/* Quick Stock Refill Button (Zomato Style) */}
         <TouchableOpacity 
           style={styles.iconCircle} 
@@ -263,20 +270,39 @@ const styles = StyleSheet.create({
     shadowColor: '#000', 
     shadowOpacity: 0.05 
   },
-  imageContainer: { 
-    position: 'relative',
-    width: 90,
-    height: 90,
-  },
-  outOfStockOverlay: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)', // हल्का काला पर्दा
-    borderRadius: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10
-  },
+imageContainer: { 
+  width: 90, 
+  height: 90, 
+  borderRadius: 15, 
+  overflow: 'hidden', 
+  backgroundColor: '#f8fafc', // Ek halka gray color, koi icon nahi!
+  justifyContent: 'center', 
+  alignItems: 'center',
+  position: 'relative',
+},
+prodImage: { 
+  width: '100%', 
+  height: '100%',
+  backgroundColor: '#f8fafc' // Agar image load nahi hota toh bhi background dikhega, koi icon nahi!
+  // Yahan se absolute, top, left sab hata dein
+},
+fallbackView: {
+  width: '100%',
+  height: '100%',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+outOfStockOverlay: {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: 'rgba(255, 255, 255, 0.7)',
+  justifyContent: 'center',
+  alignItems: 'center',
+  zIndex: 10, // Image ke upar overlay
+},
   outOfStockText: { 
     color: '#fff', 
     fontSize: 10, 
@@ -322,7 +348,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center', 
     alignItems: 'center' 
   },
-  img: { width: 80, height: 80, borderRadius: 10, backgroundColor: '#f1f5f9' },
+  // styles mein niche ise badal dein
+
   info: { flex: 1, marginLeft: 15, justifyContent: 'center' },
   name: { fontSize: 16, fontWeight: 'bold', color: '#1e293b' },
   price: { fontSize: 15, color: '#1e40af', fontWeight: '700', marginTop: 4 },

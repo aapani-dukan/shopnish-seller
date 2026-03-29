@@ -69,7 +69,7 @@ const BankDetailsScreen = ({ navigation }: any) => {
       };
 
       // ✅ Update via profile endpoint
-      await api.patch(`/api/sellers/update-profile/${user.id}`, payload);
+      await api.patch(`/api/sellers/profile/me`, payload);
       
       Alert.alert("Success ✅", "Bank details settlement ke liye save ho gayi hain!");
       navigation.goBack();

@@ -13,11 +13,13 @@ import * as Location from 'expo-location';
 // 📦 Schema: deliveryRadius को number रखा है
 const sellerSchema = z.object({
   businessName: z.string().min(3, "Business name too short"),
+  email: z.string().email("Sahi Gmail ID likhein"),
   description: z.string().min(10, "Describe your shop better"),
   businessAddress: z.string().min(10, "Full address required"),
   city: z.string().min(2, "City required"),
   pincode: z.string().regex(/^\d{6}$/, "Invalid Pincode"),
   businessPhone: z.string().regex(/^\d{10}$/, "10 digit phone required"),
+  businessType: z.string().min(2, "Business type zaroori hai"),
   bankAccountNumber: z.string().min(9, "Invalid Account Number"),
   ifscCode: z.string().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, "Invalid IFSC"),
   deliveryRadius: z.number().min(1, "Radius required").max(100), 
@@ -28,7 +30,7 @@ const sellerSchema = z.object({
 type SellerFormData = z.infer<typeof sellerSchema>;
 
 export default function SellerOnboarding() {
-  const { refreshUserStatus } = useAuth();
+  const { user,refreshUserStatus } = useAuth();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isLocating, setIsLocating] = React.useState(false);
 
@@ -36,11 +38,14 @@ export default function SellerOnboarding() {
     resolver: zodResolver(sellerSchema),
     defaultValues: { 
       businessName: '', 
+      businessPhone: user?.phoneNumber?.replace('+91', '') || '', 
+      email: user?.email || '',
+      businessType: 'Retailer',
       city: '', 
       description: '',
       businessAddress: '',
       pincode: '',
-      businessPhone: '',
+      
       bankAccountNumber: '',
       ifscCode: '',
       deliveryRadius: 5, 
@@ -99,6 +104,7 @@ export default function SellerOnboarding() {
       businessName: data.businessName,
       businessAddress: data.businessAddress,
       businessPhone: data.businessPhone,
+      email: data.email,
       description: data.description || "",
       city: data.city,
       pincode: data.pincode,
@@ -107,12 +113,13 @@ export default function SellerOnboarding() {
       deliveryRadius: data.deliveryRadius,
       // 🚨 सबसे ज़रूरी: बैकएंड 'businessType' मांग रहा है जो आपके फॉर्म में नहीं था
       // इसे अभी के लिए 'Individual' या 'Retailer' भेज देते हैं
-      businessType: "Individual", 
+      businessType: data.businessType || "Retailer", 
       
-      // ऑप्शनल लेकिन बैकएंड में कॉलम है
-      gstNumber: "", 
+      gstNumber: "", // Optional field
       latitude: data.latitude,
       longitude: data.longitude,
+      // Firebase UID authentication/linking ke liye
+      firebaseUid: user?.uid,
     };
 
     console.log("📤 Sending payload to backend:", payload);
@@ -140,7 +147,25 @@ export default function SellerOnboarding() {
         <CustomInput control={control} name="businessName" label="Business Name" icon="shopping-bag" error={errors.businessName} />
         <CustomInput control={control} name="description" label="Shop Description" icon="info" error={errors.description} />
         <CustomInput control={control} name="businessAddress" label="Full Address" icon="map-pin" error={errors.businessAddress} />
-        
+        {/* Email Input - Sabse zaroori account linking ke liye */}
+<CustomInput 
+  control={control} 
+  name="email" 
+  label="Gmail ID (For Web Login)" 
+  icon="mail" 
+  keyboardType="email-address"
+  autoCapitalize="none"
+  error={errors.email} 
+/>
+
+{/* Business Type Input */}
+<CustomInput 
+  control={control} 
+  name="businessType" 
+  label="Business Type (e.g. Retailer, Wholesaler)" 
+  icon="briefcase" 
+  error={errors.businessType} 
+/>
         <View style={{ flexDirection: 'row', gap: 10 }}>
             <View style={{ flex: 1 }}>
                 <CustomInput control={control} name="city" label="City" icon="map" error={errors.city} />

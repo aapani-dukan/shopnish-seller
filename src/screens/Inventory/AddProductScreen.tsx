@@ -6,7 +6,7 @@ import {
 import Feather from 'react-native-vector-icons/Feather';
 import { launchImageLibrary } from 'react-native-image-picker';
 import api from '../../services/api';
-
+const BASE_URL = 'https://shopnish-seprate.onrender.com';
 const { width } = Dimensions.get('window');
 
 export default function AddProductScreen({ navigation }: any) {
@@ -99,19 +99,15 @@ export default function AddProductScreen({ navigation }: any) {
 };
   // 5. Submit Handler (Industrial Grade)
 const handleSubmit = async () => {
-  // 1. Initial Loading Start
   setLoading(true);
 
   try {
     if (mode === 'catalog') {
-      // --- CATALOG MODE LOGIC ---
       const selectedArray = Object.values(selectedItems);
-      
       if (selectedArray.length === 0) {
         throw new Error("Kripya kam se kam ek product select karein.");
       }
 
-      // Check karo ki sabhi selected items ka price aur stock bhara hua hai
       const payload = selectedArray.map((item: any) => {
         const price = Number(item.price);
         const stock = Number(item.stock);
@@ -123,56 +119,61 @@ const handleSubmit = async () => {
         return {
           masterProductId: item.id,
           name: item.name,
-          image: item.image,
+          image: item.image, 
           categoryId: item.categoryId,
           price: price,
           stock: stock || 0,
-          isActive: true, // Backend logic ke liye safety
+          isActive: true,
+          // ✅ Backend ko bolo ise turant live kare
+          approvalStatus: 'approved', 
         };
       });
 
-      // API call for Bulk Insert
       await api.post('/api/products/bulk', { products: payload });
 
     } else {
-      // --- MANUAL MODE LOGIC ---
+      // --- MANUAL MODE (Dal Makhani Logic) ---
+      if (!manualData.name || manualData.name.length < 3) throw new Error("Naam chota hai.");
       
-      // Strict Validation
-      if (!manualData.name || manualData.name.length < 3) throw new Error("Product ka naam bahut chota hai.");
-      if (!manualData.image) throw new Error("Kripya product ki photo upload karein.");
+      // Agar image wahi camera icon hai ya khali hai toh roko
+      if (!manualData.image || manualData.image.includes('no-image-icon')) {
+        throw new Error("Kripya asli photo upload karein, camera icon nahi.");
+      }
+      
       if (!manualData.categoryId) throw new Error("Category chunna zaroori hai.");
       
       const price = Number(manualData.price);
       const stock = Number(manualData.stock);
 
       if (isNaN(price) || price <= 0) throw new Error("Sahi Price likhein.");
-      if (isNaN(stock) || stock < 0) throw new Error("Sahi Stock likhein.");
 
       const finalManualData = {
         ...manualData,
         price: price,
         stock: stock,
-        isActive: true, // Default active for new products
+        isActive: true,
+        approvalStatus: 'approved', // ✅ Taaki Customer App par turant dikhe
+        
+        /* Bhai Yahan Dhyan De: 
+           Backend mein agar product ke saath location nahi ja rahi, 
+           toh Customer App use filter nahi kar payegi. 
+           Backend ko ye data Seller ki profile se khud uthana chahiye.
+        */
       };
 
-      // API call for Single Insert
       await api.post('/api/products', finalManualData);
     }
 
-    // Success Feedback
     Alert.alert(
       "Success 🎉", 
-      mode === 'catalog' 
-        ? "Saare products inventory mein jod diye gaye hain!" 
-        : "Naya product live ho gaya hai!",
-      [{ text: "Great!", onPress: () => navigation.goBack() }]
+      mode === 'catalog' ? "Inventory Update Ho Gayi!" : "Product Live Ho Gaya!",
+      [{ text: "Theek Hai", onPress: () => navigation.goBack() }]
     );
 
   } catch (err: any) {
-    // Error Handling
     console.error("Submit Error:", err);
-    const errorMessage = err.response?.data?.message || err.message || "Submit nahi ho paya.";
-    Alert.alert("Rukye!", errorMessage);
+    const errorMessage = err.response?.data?.message || err.message || "Submit fail ho gaya.";
+    Alert.alert("Error", errorMessage);
   } finally {
     setLoading(false);
   }
@@ -183,7 +184,16 @@ const handleSubmit = async () => {
     return (
       <View style={[styles.itemCard, isSelected && styles.selectedCard]}>
         <View style={styles.itemMain}>
-          <Image source={{ uri: item.image }} style={styles.itemImg} />
+       <Image 
+  source={{ 
+    uri: item.image?.includes('placehold.co') 
+      ? `${item.image}.png` // SVG fix
+      : (item.image || 'https://via.placeholder.com/150.png')
+  }} 
+  style={styles.img} 
+  resizeMode="contain"
+  // ❌ defaultSource wali line delete kar do agar error aa raha hai
+/>
           <View style={{ flex: 1, marginLeft: 12 }}>
             <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
             <View style={styles.badgeRow}>
@@ -360,6 +370,7 @@ const handleSubmit = async () => {
 }
 
 const styles = StyleSheet.create({
+   img: { width: 80, height: 80, borderRadius: 10, backgroundColor: '#f1f5f9' },
   container: { flex: 1, backgroundColor: '#FFFFFF' },
   headerTabs: { flexDirection: 'row', backgroundColor: '#F8FAFC', padding: 6, margin: 16, borderRadius: 16 },
   tab: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 12 },

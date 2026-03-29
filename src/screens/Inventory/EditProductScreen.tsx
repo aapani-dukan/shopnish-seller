@@ -21,50 +21,100 @@ export default function EditProductScreen({ route, navigation }: any) {
 // fetchData mein price set karein
 const fetchData = useCallback(async () => {
   try {
-    const [prodRes, catRes] = await Promise.all([
-      api.get(`/api/products/${productId}`),
-      api.get('/api/categories/all')
-    ]);
-    const product = prodRes.data.product;
-    setFormData(product);
-    setInitialPrice(String(product.price)); // Save initial price
-    setCategories(catRes.data.categories || []);
-  } catch (err) {
-    Alert.alert("Error", "Data load nahi ho paya.");
+    setLoading(true);
+    const response = await api.get(`/api/products/${productId}`);
+
+    // ✅ Fix 1: Wrap Check
+    // Agar data seedha object hai (formatProductWithOffers ki wajah se), 
+    // toh use hi formData bana do.
+    const productData = response.data.product ? response.data.product : response.data;
+
+    if (productData && productData.id) {
+      setFormData(productData);
+      setInitialPrice(String(productData.price || '0'));
+    } else {
+      // Agar yahan 200 OK aaya par data khali hai
+      Alert.alert("Data Error", "Product ki jankari sahi format mein nahi mili.");
+    }
+  } catch (err: any) {
+    // ✅ Fix 2: 404 Handle
+    if (err.response?.status === 404) {
+      Alert.alert(
+        "Product Not Found (404)", 
+        "Ya toh ID galat hai, ya product abhi Approved nahi hai (Backend logic)."
+      );
+    }
   } finally {
     setLoading(false);
   }
 }, [productId]);
 
+useEffect(() => {
+  if (productId) {
+    fetchData();
+  }
+}, [fetchData, productId]);
 // 2. Updated Handle Update Logic
-const handleUpdate = async () => {
-  if (!formData.name || !formData.price) {
+
+  const handleUpdate = async () => {
+  if (!formData?.name || !formData?.price) {
     Alert.alert("Rukiye!", "Naam aur Price zaroori hain.");
     return;
   }
 
-  // Versioning Logic Check
-  let updatePayload = { ...formData };
-  if (String(formData.price) !== initialPrice) {
-    // Agar price badla hai, toh reason puchein (Optional par Pro lagta hai)
-    updatePayload.changeReason = "Price updated via Seller App";
-  }
-
   setSaving(true);
   try {
-    // Backend service ko call karein (Jo humne ProductService mein banaya tha)
-    await api.patch(`/api/products/${productId}`, updatePayload);
+    // 1. Destructure karke faltu fields ko bahar nikaal dein
+    // category, version aur timestamps ko database update mein nahi bhejte
+    const { 
+      category, 
+      version, 
+      createdAt, 
+      updatedAt, 
+      id, 
+      _id,
+      ...rawPayload 
+    } = formData;
+
+    // 2. Final Payload taiyar karein
+    let updatePayload = {
+      ...rawPayload,
+      price: String(formData.price), // Ensure string format
+      stock: Number(formData.stock), // Ensure number format
+    };
+
+    // 3. Versioning Logic (Price change check)
+    if (String(formData.price) !== initialPrice) {
+      updatePayload.changeReason = "Price updated via Seller App";
+      // Agar aapka backend 'version' field auto-increment karta hai toh use yahan mat bhejo
+    }
+
+    console.log("🚀 Sending Clean Payload:", updatePayload);
+
+    // 4. API Call
+    await api.patch(`/api/sellers/products/${productId}`, updatePayload);
     
-    Alert.alert("Success ✅", "Product update ho gaya aur history save ho gayi!", [
+    Alert.alert("Success ✅", "Product update ho gaya!", [
       { text: "Mast!", onPress: () => navigation.goBack() }
     ]);
-  } catch (err) {
-    Alert.alert("Update Failed", "Server error. Check inventory.");
+  } catch (err: any) {
+    console.error("Update Error Details:", err.response?.data || err.message);
+    
+    const errorMsg = err.response?.data?.message || "Server error. Details check karein.";
+    Alert.alert("Update Failed ❌", errorMsg);
   } finally {
     setSaving(false);
   }
 };
-  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#1e40af" /></View>;
+  // Agar loading ho rahi hai YA formData abhi tak null hai, toh gola dikhao
+if (loading || !formData) {
+  return (
+    <View style={styles.center}>
+      <ActivityIndicator size="large" color="#1e40af" />
+      <Text style={{ marginTop: 10 }}>Data load ho raha hai...</Text>
+    </View>
+  );
+}
 
   return (
     <KeyboardAvoidingView 
@@ -72,20 +122,28 @@ const handleUpdate = async () => {
       style={{ flex: 1 }}
     >
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
-        
-        {/* Product Image Preview */}
-        <View style={styles.imageContainer}>
-          <Image source={{ uri: formData.image }} style={styles.productImg} />
-          <View style={styles.imageOverlay}>
-            <Text style={styles.imageHint}>Web dashboard se photo badlein</Text>
-          </View>
-        </View>
-
+        {/* Product Image Preview - Safety added with formData && */}
+<View style={styles.imageContainer}>
+  {formData && (
+    <Image 
+      source={{ 
+        uri: formData?.image 
+          ? encodeURI(formData?.image.trim()) 
+          : 'https://via.placeholder.com/150.png' 
+      }} 
+      style={styles.productImg} 
+    />
+  )}
+  <View style={styles.imageOverlay}>
+    <Text style={styles.imageHint}>Web dashboard se photo badlein</Text>
+  </View>
+</View>
+     
         <View style={styles.form}>
           <Text style={styles.label}>Product Ka Naam</Text>
           <TextInput 
             style={styles.input}
-            value={formData.name}
+            value={formData?.name}
             onChangeText={(v) => setFormData({...formData, name: v})}
           />
 
@@ -95,7 +153,7 @@ const handleUpdate = async () => {
               <TextInput 
                 style={styles.input}
                 keyboardType="numeric"
-                value={String(formData.price)}
+                value={String(formData?.price)}
                 onChangeText={(v) => setFormData({...formData, price: v})}
               />
             </View>
@@ -104,7 +162,7 @@ const handleUpdate = async () => {
               <TextInput 
                 style={styles.input}
                 keyboardType="numeric"
-                value={String(formData.stock)}
+                value={String(formData?.stock)}
                 onChangeText={(v) => setFormData({...formData, stock: v})}
               />
             </View>
@@ -114,7 +172,7 @@ const handleUpdate = async () => {
           <TextInput 
             style={[styles.input, { height: 100, textAlignVertical: 'top' }]}
             multiline
-            value={formData.description}
+            value={formData?.description}
             onChangeText={(v) => setFormData({...formData, description: v})}
           />
 <View style={{ flex: 1, marginRight: 10 }}>
@@ -122,14 +180,14 @@ const handleUpdate = async () => {
   <TextInput 
     style={[
       styles.input, 
-      String(formData.price) !== initialPrice && { borderColor: '#1e40af', borderWidth: 2 }
+      String(formData?.price) !== initialPrice && { borderColor: '#1e40af', borderWidth: 2 }
     ]}
     keyboardType="numeric"
     value={String(formData.price)}
     onChangeText={(v) => setFormData({...formData, price: v})}
   />
   {/* Price Change Indicator */}
-  {String(formData.price) !== initialPrice && (
+  {String(formData?.price) !== initialPrice && (
     <Text style={{ fontSize: 10, color: '#1e40af', marginTop: -15, marginBottom: 10 }}>
       Price change detect hua hai (Versioning ON)
     </Text>
@@ -139,13 +197,13 @@ const handleUpdate = async () => {
           <View style={styles.statusBox}>
             <View>
               <Text style={styles.statusTitle}>Dukaan mein dikhayein?</Text>
-              <Text style={styles.statusSub}>{formData.isActive ? 'Abhi Customer ko dikh raha hai' : 'Abhi chupa hua hai'}</Text>
+              <Text style={styles.statusSub}>{formData?.isActive ? 'Abhi Customer ko dikh raha hai' : 'Abhi chupa hua hai'}</Text>
             </View>
             <TouchableOpacity 
-              onPress={() => setFormData({...formData, isActive: !formData.isActive})}
+              onPress={() => setFormData({...formData, isActive: !formData?.isActive})}
               style={[styles.toggle, { backgroundColor: formData.isActive ? '#10b981' : '#cbd5e1' }]}
             >
-              <View style={[styles.toggleCircle, { alignSelf: formData.isActive ? 'flex-end' : 'flex-start' }]} />
+              <View style={[styles.toggleCircle, { alignSelf: formData?.isActive ? 'flex-end' : 'flex-start' }]} />
             </TouchableOpacity>
           </View>
 
