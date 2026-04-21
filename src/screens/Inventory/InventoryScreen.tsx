@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import Feather from 'react-native-vector-icons/Feather';
 import api from '../../services/api';
-const BASE_URL = 'https://shopnish-seprate.onrender.com';
+const BASE_URL = 'https://api.shopnish.com';
 const { width } = Dimensions.get('window');
 export default function InventoryScreen({ navigation }: any) {
   const [products, setProducts] = useState<any[]>([]);

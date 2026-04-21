@@ -6,7 +6,7 @@ import {
 import Feather from 'react-native-vector-icons/Feather';
 import { launchImageLibrary } from 'react-native-image-picker';
 import api from '../../services/api';
-const BASE_URL = 'https://shopnish-seprate.onrender.com';
+const BASE_URL = 'https://api.shopnish.com';
 const { width } = Dimensions.get('window');
 
 export default function AddProductScreen({ navigation }: any) {

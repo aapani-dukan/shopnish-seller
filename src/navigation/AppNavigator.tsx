@@ -6,7 +6,8 @@ import Feather from 'react-native-vector-icons/Feather';
 
 // Context & Hooks
 import { useAuth } from '../context/AuthContext';
-
+import { View, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
+// Context
 // Screens
 import AuthScreen from '../screens/Auth/AuthScreen';
 import SellerStatusScreen from '../screens/Auth/SellerStatusScreen';
@@ -28,7 +29,32 @@ const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
 // --- SELLER TAB NAVIGATION ---
-function SellerTabs() {
+  const SellerTabs = () => {
+  const { user, refreshUserStatus } = useAuth();
+
+  // ✅ CONFIRMED: Logs ke mutabiq ye do fields check karni hain
+  const status = user?.seller_approval_status || user?.sellerApprovalStatus;
+  // 🚩 Agar status pending hai, toh Dashboard nahi, Message dikhao
+  if (status === 'pending') {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#001B3A', padding: 20 }}>
+        <Text style={{ fontSize: 70, marginBottom: 20 }}>⏳</Text>
+        <Text style={{ color: '#D4AF37', fontSize: 24, fontWeight: 'bold', textAlign: 'center' }}>
+          Verification Pending
+        </Text>
+        <Text style={{ color: '#94a3b8', textAlign: 'center', marginTop: 15, fontSize: 16, lineHeight: 22 }}>
+          aapka registration mil gaya hai. Admin approval ke baad dashboard chalu ho jayega.
+        </Text>
+        
+        <TouchableOpacity 
+          onPress={refreshUserStatus}
+          style={{ backgroundColor: '#D4AF37', marginTop: 30, paddingVertical: 15, paddingHorizontal: 40, borderRadius: 10 }}
+        >
+          <Text style={{ color: '#001B3A', fontWeight: 'bold' }}>Status Check Karein</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -63,7 +89,8 @@ export default function AppNavigator() {
   if (isLoadingAuth) {
     return null; // Yahan Splash Screen loading indicator daal sakte hain
   }
-
+const isApproved = user?.seller_approval_status === 'approved' || user?.sellerApprovalStatus === 'approved';
+  const isPending = user?.seller_approval_status === 'pending' || user?.sellerApprovalStatus === 'pending';
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -73,61 +100,21 @@ export default function AppNavigator() {
           <Stack.Screen name="Auth" component={AuthScreen} />
         ) : (
           <>
-            {/* 3. Logical Flow based on Approval Status */}
-            {user?.role === 'seller' && user?.sellerProfile?.approvalStatus === 'approved' ? (
-              // Case A: Approved Seller - Main App
+          {/* 3. Naya Logical Flow based on Status */}
+            {user?.role === 'seller' && isApproved ? (
+              // Case A: Approved Seller
               <>
                 <Stack.Screen name="SellerMain" component={SellerTabs} />
-                <Stack.Screen 
-                  name="OrderDetails" 
-                  component={OrderDetailsScreen} 
-                  options={{ 
-                    headerShown: true, 
-                    title: 'Order Details',
-                    headerTitleAlign: 'center',
-                    headerShadowVisible: false,
-                    headerBackTitle: "",
-                  }} 
-                />
-                <Stack.Screen 
-                  name="AddProduct" 
-                  component={AddProductScreen} 
-                  options={{ headerShown: true, title: 'Add New Product', headerBackTitle: "" }} 
-                />
-                <Stack.Screen 
-  name="SellerWallet" 
-  component={SellerWalletScreen} 
-  options={{ 
-    headerShown: true, 
-    title: 'My Wallet',
-    headerStyle: { backgroundColor: '#fff' },
-    headerTitleStyle: { fontWeight: '800', color: '#001B3A' },
-    headerShadowVisible: false, // क्लीन लुक के लिए
-  }} 
-/>
-                <Stack.Screen 
-  name="BankDetails" 
-  component={BankDetailsScreen} 
-  options={{ 
-    title: 'Bank Account Setup',
-    headerTitleStyle: { fontWeight: '900', color: '#000' },
-    headerShadowVisible: false,
-  }} 
-/>
-
-<Stack.Screen 
-    name="TaxInfo" 
-    component={TaxInfoScreen} 
-  />
-<Stack.Screen name="ShopDetails" component={ShopDetailsScreen} options={{ headerShown: false }} />
-                <Stack.Screen 
-                  name="EditProduct" 
-                  component={EditProductScreen} 
-                  options={{ headerShown: true, title: 'Edit Product', headerBackTitle: "" }} 
-                />
+                <Stack.Screen name="OrderDetails" component={OrderDetailsScreen} options={{ headerShown: true, title: 'Order Details' }} />
+                <Stack.Screen name="AddProduct" component={AddProductScreen} options={{ headerShown: true, title: 'Add New Product' }} />
+                <Stack.Screen name="SellerWallet" component={SellerWalletScreen} options={{ headerShown: true, title: 'My Wallet' }} />
+                <Stack.Screen name="BankDetails" component={BankDetailsScreen} options={{ title: 'Bank Account Setup' }} />
+                <Stack.Screen name="TaxInfo" component={TaxInfoScreen} />
+                <Stack.Screen name="ShopDetails" component={ShopDetailsScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="EditProduct" component={EditProductScreen} options={{ headerShown: true, title: 'Edit Product' }} />
               </>
-            ) : user?.role === 'seller' && user?.sellerProfile?.approvalStatus === 'pending' ? (
-              // Case B: Review State
+            ) : user?.role === 'seller' && isPending ? (
+           // Case B: Review State
               <Stack.Screen name="SellerStatus" component={SellerStatusScreen} />
             ) : (
               // Case C: New/Rejected (Registration/Application Flow)

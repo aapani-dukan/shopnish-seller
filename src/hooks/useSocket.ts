@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 
 // आपकी Render वाली URL
-const SOCKET_URL = "https://shopnish-seprate.onrender.com";
+const SOCKET_URL = "https://api.shopnish.com";
 
 export const useSocket = (orderId?: number) => {
   const socketRef = useRef<Socket | null>(null);
