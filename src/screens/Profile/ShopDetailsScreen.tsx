@@ -68,27 +68,30 @@ const [radius, setRadius] = useState(''); // Radius store karne ke liye
 
   // 1. Load Data on Mount
   useEffect(() => {
-  if (user && user.sellerProfile) {
-    const profile = user.sellerProfile; // 👈 Profile shortcut
-    
+  // ✅ Logs ke mutabiq data direct 'user' mein hai, 'sellerProfile' mein nahi
+  if (user) {
     setShopInfo({
-      id: profile.id, // ✅ Ye 11 set karega
-      businessName: profile.businessName || '',
-      description: profile.description || '',
-      businessAddress: profile.businessAddress || '',
-      pincode: profile.pincode || '',
-      openTime: '09:00 AM', // Agar ye DB mein nahi hai toh default rahega
-      closeTime: '10:00 PM',
+      id: user.id || null, 
+      businessName: user.business_name || user.businessName || '',
+      description: user.description || '',
+      businessAddress: user.business_address || user.businessAddress || '',
+      pincode: user.pincode || '',
+      openTime: user.open_time || '09:00 AM',
+      closeTime: user.close_time || '10:00 PM',
     });
-    setIsDistanceBased(profile.isDistanceBasedDelivery || false);
-    setRadius(profile.deliveryRadius ? String(profile.deliveryRadius) : '');
+
+    setIsDistanceBased(user.is_distance_based_delivery || user.isDistanceBasedDelivery || false);
+    setRadius(user.delivery_radius ? String(user.delivery_radius) : String(user.deliveryRadius || ''));
     
-    // ✅ Logs ke mutabiq profile.deliveryPincodes mein array hai
-    if (profile.deliveryPincodes) {
-      setDeliveryPincodes(profile.deliveryPincodes);
+    // ✅ Pincodes check karein (Snake case vs Camel case dono handle karein)
+    const pincodes = user.delivery_pincodes || user.deliveryPincodes;
+    if (pincodes) {
+      setDeliveryPincodes(pincodes);
     }
     
-    setIsAutoAccept(profile.isAutoAccept || false);
+    setIsAutoAccept(user.is_auto_accept || user.isAutoAccept || false);
+    
+    // 🚩 Sabse zaroori: Loading yahan false hogi
     setInitialLoading(false);
   }
 }, [user]);
