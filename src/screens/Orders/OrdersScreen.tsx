@@ -57,7 +57,7 @@ export default function OrdersScreen({ navigation }: any) {
   const updateStatus = async (orderId: string, newStatus: string) => {
   try {
     // URL ko /api prefix ke saath consistent rakhein
-    await api.patch(`/api/sub-orders/${orderId}/status`, { status: newStatus });
+    await api.patch(`/api/sellers/sub-orders/${orderId}/status`, { status: newStatus });
     
     // ✅ High-Class Feedback: Sound ya Haptic feedback yahan add kar sakte hain
     Alert.alert("सफलता", `ऑर्डर अब ${statusConfig[newStatus].label} है।`);

@@ -22,7 +22,7 @@ export default function OrderDetailsScreen({ route, navigation }: any) {
   const fetchOrderDetails = async () => {
   try {
     // ✅ URL ko /api ke saath consistent rakhein
-    const res = await api.get(`/api/suborders/${orderId}/details`);
+    const res = await api.get(`/api/sellers/sub-orders/${orderId}/details`);
     setOrder(res.data.subOrder);
   } catch (err) {
     Alert.alert("Error", "Details load nahi ho payi.");
@@ -35,7 +35,7 @@ export default function OrderDetailsScreen({ route, navigation }: any) {
 const updateStatus = async (newStatus: string) => {
   setUpdating(true);
   try {
-    await api.patch(`/api/suborders/${orderId}/status`, { status: newStatus });
+    await api.patch(`/api/sellers/sub-orders/${orderId}/status`, { status: newStatus });
     
     // Status ke hisaab se Hindi message (High-Class touch)
     const displayStatus = newStatus === 'accepted' ? 'स्वीकार' : 'अपडेट';
@@ -176,11 +176,18 @@ const updateStatus = async (newStatus: string) => {
         )}
         
         {order?.status === 'accepted' && (
-          <TouchableOpacity style={styles.fullWidthBtn} onPress={() => updateStatus('ready_for_pickup')}>
-            <Feather name="package" size={20} color="#fff" />
-            <Text style={[styles.btnText, { marginLeft: 10 }]}>Mark as Ready for Pickup</Text>
-          </TouchableOpacity>
-        )}
+  <TouchableOpacity style={styles.fullWidthBtn} onPress={() => updateStatus('preparing')}>
+    <Feather name="play" size={20} color="#fff" />
+    <Text style={styles.btnText}>Start Preparing</Text>
+  </TouchableOpacity>
+)}
+
+{order?.status === 'preparing' && (
+  <TouchableOpacity style={styles.fullWidthBtn} onPress={() => updateStatus('ready_for_pickup')}>
+    <Feather name="package" size={20} color="#fff" />
+    <Text style={styles.btnText}>Mark as Ready for Pickup</Text>
+  </TouchableOpacity>
+)}
         
         {order?.status === 'ready_for_pickup' && (
           <View style={styles.waitingBox}>
