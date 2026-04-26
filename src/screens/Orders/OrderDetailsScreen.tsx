@@ -131,34 +131,51 @@ const updateStatus = async (newStatus: string) => {
           </TouchableOpacity>
         </View>
 
-        {/* Order Items Section */}
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Items in this Order</Text>
-          {order?.items?.map((item: any, index: number) => (
-            <View key={index} style={styles.itemRow}>
-              <View style={styles.qtyBadge}>
-                <Text style={styles.qtyText}>{item.quantity}x</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.productName}>{item.productName}</Text>
-                <Text style={styles.unitText}>{item.unit || 'per unit'}</Text>
-              </View>
-              <Text style={styles.priceText}>₹{item.itemTotal}</Text>
-            </View>
-          ))}
-          
-          <View style={styles.billContainer}>
-            <View style={styles.billRow}><Text style={styles.billLabel}>Item Total</Text><Text style={styles.billValue}>₹{order?.total}</Text></View>
-            <View style={styles.billRow}><Text style={styles.billLabel}>Delivery Fee</Text><Text style={[styles.billValue, { color: '#10b981' }]}>FREE</Text></View>
-            <View style={[styles.billRow, { marginTop: 10 }]}><Text style={styles.grandTotalLabel}>Grand Total</Text><Text style={styles.grandTotalValue}>₹{order?.total}</Text></View>
-          </View>
-        </View>
+       // OrderDetailsScreen.tsx ke andar ye badlav karein:
 
-        {/* Order Info */}
-        <View style={[styles.card, { backgroundColor: '#f8fafc', borderStyle: 'dashed', borderWidth: 1, borderColor: '#cbd5e1' }]}>
-            <Text style={styles.infoText}>Placed on: {format(new Date(order?.cretedAt), 'PPPP, hh:mm a')}</Text>
-            <Text style={styles.infoText}>Payment Method: {order?.paymentMethod || 'Online'}</Text>
+{/* Items in this Order Section */}
+<View style={styles.card}>
+  <Text style={styles.sectionTitle}>Items in this Order</Text>
+  {/* order?.items use karein kyunki humne backend se 'items' key bheji hai */}
+  {order?.items && order.items.length > 0 ? (
+    order.items.map((item: any, index: number) => (
+      <View key={index} style={styles.itemRow}>
+        <View style={styles.qtyBadge}>
+          <Text style={styles.qtyText}>{item.quantity}x</Text>
         </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.productName}>{item.productName}</Text>
+          <Text style={styles.unitText}>{item.unit}</Text>
+        </View>
+        <Text style={styles.priceText}>₹{item.itemTotal}</Text>
+      </View>
+    ))
+  ) : (
+    <Text style={{ textAlign: 'center', margin: 10 }}>No items found in this order.</Text>
+  )}
+  
+  <View style={styles.billContainer}>
+    <View style={styles.billRow}>
+      <Text style={styles.billLabel}>Grand Total</Text>
+      <Text style={styles.grandTotalValue}>₹{order?.total}</Text>
+    </View>
+    {/* Display Payment Method clearly */}
+    <View style={styles.billRow}>
+      <Text style={styles.billLabel}>Mode:</Text>
+      <Text style={[styles.billValue, { color: '#1e40af' }]}>{order?.paymentMethod}</Text>
+    </View>
+  </View>
+</View>
+
+{/* Placed on logic fixed (Spelling: createdAt) */}
+<View style={[styles.card, { backgroundColor: '#f8fafc', borderStyle: 'dashed', borderWidth: 1, borderColor: '#cbd5e1' }]}>
+    <Text style={styles.infoText}>
+        Placed on: {order?.createdAt 
+            ? format(new Date(order.createdAt), 'PPPP, hh:mm a') 
+            : 'Date not available'}
+    </Text>
+    <Text style={styles.infoText}>Payment Status: {order?.paymentMethod}</Text>
+</View>
 
       </ScrollView>
 
