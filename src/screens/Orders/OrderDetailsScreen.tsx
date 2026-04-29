@@ -130,14 +130,10 @@ const updateStatus = async (newStatus: string) => {
             </View>
           </TouchableOpacity>
         </View>
-
-       // OrderDetailsScreen.tsx ke andar ye badlav karein:
-
 {/* Items in this Order Section */}
 <View style={styles.card}>
   <Text style={styles.sectionTitle}>Items in this Order</Text>
-  {/* order?.items use karein kyunki humne backend se 'items' key bheji hai */}
-  {order?.items && order.items.length > 0 ? (
+{order?.items && order.items.length > 0 ? (
     order.items.map((item: any, index: number) => (
       <View key={index} style={styles.itemRow}>
         <View style={styles.qtyBadge}>
@@ -145,7 +141,7 @@ const updateStatus = async (newStatus: string) => {
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.productName}>{item.productName}</Text>
-          <Text style={styles.unitText}>{item.unit}</Text>
+         <Text style={styles.unitText}>{String(item.unit || 'unit')}</Text>
         </View>
         <Text style={styles.priceText}>₹{item.itemTotal}</Text>
       </View>
@@ -159,22 +155,21 @@ const updateStatus = async (newStatus: string) => {
       <Text style={styles.billLabel}>Grand Total</Text>
       <Text style={styles.grandTotalValue}>₹{order?.total}</Text>
     </View>
-    {/* Display Payment Method clearly */}
-    <View style={styles.billRow}>
+<View style={styles.billRow}>
       <Text style={styles.billLabel}>Mode:</Text>
-      <Text style={[styles.billValue, { color: '#1e40af' }]}>{order?.paymentMethod}</Text>
+     <Text style={[styles.billValue, { color: '#1e40af' }]}>
+  {String(order?.paymentMethod || 'N/A')}
+</Text>
     </View>
   </View>
 </View>
-
-{/* Placed on logic fixed (Spelling: createdAt) */}
 <View style={[styles.card, { backgroundColor: '#f8fafc', borderStyle: 'dashed', borderWidth: 1, borderColor: '#cbd5e1' }]}>
     <Text style={styles.infoText}>
         Placed on: {order?.createdAt 
             ? format(new Date(order.createdAt), 'PPPP, hh:mm a') 
             : 'Date not available'}
     </Text>
-    <Text style={styles.infoText}>Payment Status: {order?.paymentMethod}</Text>
+    <Text style={styles.infoText}>Payment Status: {order?.paymentStatus}</Text>
 </View>
 
       </ScrollView>
