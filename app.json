@@ -19,21 +19,25 @@
       "bundleIdentifier": "com.shopnish.seller"
     },
     "android": {
-  "package": "com.shopnish.seller",
-  "googleServicesFile": "./google-services.json",
-  "adaptiveIcon": {
-    "foregroundImage": "./assets/adaptive-icon.png",
-    "backgroundColor": "#001B3A"
-  }
-},
-      
+      "package": "com.shopnish.seller",
+      "googleServicesFile": "./google-services.json",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#001B3A"
+      }
+    },
     "web": {
       "favicon": "./assets/favicon.png"
     },
-   "plugins": [
-  "expo-asset",
-  "@react-native-firebase/app",
-  "@react-native-firebase/auth"
-]
+    "plugins": [
+      "expo-asset",
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "cdd5f700-e77b-40d3-bd9b-e7e48f6b3725"
+      }
+    }
   }
 }

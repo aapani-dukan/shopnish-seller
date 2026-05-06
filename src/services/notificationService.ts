@@ -19,7 +19,7 @@ export const registerForPushNotificationsAsync = async (userId: number) => {
     }
     // Expo token ya FCM token nikalna
     token = (await Notifications.getExpoPushTokenAsync({
-      projectId: 'your-expo-project-id', // Expo dashboard se milega
+      projectId: 'cdd5f700-e77b-40d3-bd9b-e7e48f6b3725', // Expo dashboard se milega
     })).data;
     
     console.log("🔥 FCM Token:", token);
@@ -36,9 +36,21 @@ export const registerForPushNotificationsAsync = async (userId: number) => {
   }
 
   if (Platform.OS === 'android') {
+    // 🚨 1. Naya Order Channel (Siren ke liye)
+    Notifications.setNotificationChannelAsync('orders_channel', {
+      name: 'New Order Alerts',
+      importance: Notifications.AndroidImportance.MAX, // Sabse high priority
+      sound: 'siren.mp3', // 👈 Yeh file res/raw/siren.mp3 mein honi chahiye
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#FF231F7C',
+      enableVibrate: true,
+      showBadge: true,
+    });
+
+    // 2. Default Channel (Normal notifications ke liye)
     Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
-      importance: Notifications.AndroidImportance.MAX,
+      name: 'General Notifications',
+      importance: Notifications.AndroidImportance.DEFAULT,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#FF231F7C',
     });

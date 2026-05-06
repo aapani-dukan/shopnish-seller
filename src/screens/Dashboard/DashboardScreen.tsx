@@ -8,10 +8,12 @@ import Feather from 'react-native-vector-icons/Feather';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigation } from '@react-navigation/native';
+import { useSocket } from '../../hooks/useSocket';
 const { width } = Dimensions.get('window');
 // ... (Aapke baaki imports same rahenge)
 
 export default function DashboardScreen({ navigation }: any) {
+  const { isConnected } = useSocket();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
@@ -163,7 +165,10 @@ const updateStatusMutation = useMutation({
             <Text style={styles.seeAll}>View All</Text>
           </TouchableOpacity>
         </View>
-
+<View style={{ flexDirection: 'row', marginTop: 10 }}>
+        <Text>Server Status: </Text>
+        <Text>{isConnected ? "🟢 Online (Siren Ready)" : "🔴 Offline (Check Internet)"}</Text>
+      </View>
         {/* Recent Orders List */}
         {dashboardData?.recentOrders?.length > 0 ? (
           dashboardData.recentOrders.map((order: any) => (
