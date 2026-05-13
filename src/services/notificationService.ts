@@ -14,17 +14,13 @@ export const registerForPushNotificationsAsync = async (userId: number) => {
       finalStatus = status;
     }
     if (finalStatus !== 'granted') {
-      console.log('Failed to get push token for push notification!');
       return;
     }
-    // Expo token ya FCM token nikalna
+    
     token = (await Notifications.getExpoPushTokenAsync({
-      projectId: 'cdd5f700-e77b-40d3-bd9b-e7e48f6b3725', // Expo dashboard se milega
+      projectId: 'cdd5f700-e77b-40d3-bd9b-e7e48f6b3725',
     })).data;
     
-    console.log("🔥 FCM Token:", token);
-
-    // ✅ Token ko backend mein save karein taaki hum baad mein bhej sakein
     try {
       await api.patch(`/api/sellers/update-fcm-token`, { 
         userId, 
@@ -36,23 +32,27 @@ export const registerForPushNotificationsAsync = async (userId: number) => {
   }
 
   if (Platform.OS === 'android') {
-    // 🚨 1. Naya Order Channel (Siren ke liye)
-    Notifications.setNotificationChannelAsync('orders_channel', {
-      name: 'New Order Alerts',
-      importance: Notifications.AndroidImportance.MAX, // Sabse high priority
-      sound: 'siren.mp3', // 👈 Yeh file res/raw/siren.mp3 mein honi chahiye
+    // 🚨 1. ID badal kar 'v10' kiya (Purani settings reset karne ke liye)
+    await Notifications.setNotificationChannelAsync('orders_siren_v10', {
+      name: 'Urgent Order Siren', // Settings mein ab ye naam dikhega
+      importance: Notifications.AndroidImportance.MAX, 
+      sound: 'siren.mp3', // 👈 Pakka karein file assets folder mein hai
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#FF231F7C',
       enableVibrate: true,
       showBadge: true,
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      bypassDnd: true, 
+      // 🚨 Audio Attributes zaroori hain background sound ke liye
+      audioAttributes: {
+        usage: Notifications.AndroidAudioUsage.NOTIFICATION_RINGTONE,
+        contentType: Notifications.AndroidAudioContentType.SONIFICATION,
+      },
     });
 
-    // 2. Default Channel (Normal notifications ke liye)
     Notifications.setNotificationChannelAsync('default', {
       name: 'General Notifications',
       importance: Notifications.AndroidImportance.DEFAULT,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#FF231F7C',
     });
   }
 

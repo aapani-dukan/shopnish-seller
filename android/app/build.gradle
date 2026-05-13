@@ -122,7 +122,7 @@ android {
 
             // ✅ Performance aur size chota karne ke liye in dono ko true rakhein
             minifyEnabled true
-            shrinkResources true
+            shrinkResources false
 
             // ✅ APK ke images (PNGs) ko compress karne ke liye
             crunchPngs (findProperty('android.enablePngCrunchInReleaseBuilds')?.toBoolean() ?: true)
