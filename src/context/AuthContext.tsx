@@ -1,3 +1,4 @@
+import * as Notifications from 'expo-notifications';
 import React, { createContext, useContext, useState, useEffect } from 'react';
 // ✅ Modular Imports (Warnings हटाने के लिए)
 import { 
@@ -43,8 +44,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
     return unsubscribe;
   }, []);
-
-  const syncUserWithBackend = async (firebaseUser: FirebaseAuthTypes.User) => {
+const syncUserWithBackend = async (firebaseUser: FirebaseAuthTypes.User) => {
     try {
       // ✅ getIdToken(true) वार्निंग फ्री है
       const token = await getIdToken(firebaseUser);
@@ -63,12 +63,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         setUser({ uid: firebaseUser.uid, phoneNumber: firebaseUser.phoneNumber });
       }
+
+      // 🚨 PUSH NOTIFICATION TOKEN SYNC LOGIC (The Solution) 🚨
+      try {
+        // 1. App se naya push token nikaalein
+        const expoTokenResponse = await Notifications.getExpoPushTokenAsync();
+        const fcmTokenForBackend = expoTokenResponse.data;
+
+        if (fcmTokenForBackend) {
+          console.log("📱 [AuthContext]: Generated Push Token:", fcmTokenForBackend);
+          
+          // 2. Backend ko API call bhejkar database mein token save karwayein
+          // Note: Apne backend ke sahi route ke hisab se path set karein (jaise '/api/users/update-token')
+          await api.post('/api/users/update-token', { fcmToken: fcmTokenForBackend });
+          console.log("🚀 [AuthContext]: Token successfully synced with Database!");
+        }
+      } catch (tokenErr) {
+        // Ise alag try-catch mein rakha hai taaki agar notification permission na ho, toh login na ruke
+        console.error("⚠️ [AuthContext] Failed to sync push token:", tokenErr);
+      }
+
     } catch (err) {
       console.error("Sync Error:", err);
       setUser({ uid: firebaseUser.uid, phoneNumber: firebaseUser.phoneNumber });
     }
   };
-
+  
   const sendOtp = async (phoneNumber: string) => {
     try {
       // ✅ Modular SDK: signInWithPhoneNumber(auth, ...)

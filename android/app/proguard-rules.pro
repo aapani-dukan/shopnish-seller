@@ -10,11 +10,5 @@
 # react-native-reanimated
 -keep class com.swmansion.reanimated.** { *; }
 -keep class com.facebook.react.turbomodule.** { *; }
-# React Native Sound
--keep class com.zmxv.RNSound.** { *; }
--keep class com.zmxv.RNSound.* { *; }
--keepclassmembers class **.R$* {
-    public static <fields>;
-}
-# Add any project specific keep options here:
 
+# Add any project specific keep options here:
