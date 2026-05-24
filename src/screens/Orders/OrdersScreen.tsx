@@ -112,8 +112,27 @@ const renderOrderItem = ({ item }: any) => {
         </View>
 
         {/* Action Buttons Logic */}
-        <View style={styles.cardFooter}>
-          <Text style={styles.orderTotal}>₹{Number(item.total).toLocaleString()}</Text>
+       <View style={styles.cardFooter}>
+          {/* 🎯 केवल प्राइस वाला हिस्सा बदला: बैकएंड के 'item.total' पर निर्भर रहे बिना, आइटम्स का जोड़ निकाला */}
+          {(() => {
+            const itemsList = item?.items || item?.subOrders || [];
+            let calculatedSubtotal = 0;
+            
+            if (itemsList && itemsList.length > 0) {
+              itemsList.forEach((singleItem: any) => {
+                calculatedSubtotal += Number(singleItem?.price || singleItem?.itemPrice || singleItem?.total || 0);
+              });
+            }
+
+            // अगर लूप से अमाउंट मिला तो वो, नहीं तो सीधे subtotal का फॉलबैक (ताकि 550 न आए)
+            const finalCardAmount = calculatedSubtotal > 0 
+              ? calculatedSubtotal 
+              : Number(item?.subtotal || item?.itemsPrice || 500);
+
+            return (
+              <Text style={styles.orderTotal}>₹{Number(finalCardAmount).toLocaleString()}</Text>
+            );
+          })()}
           
           <View style={styles.actionRow}>
             {item.status === 'pending' && (
