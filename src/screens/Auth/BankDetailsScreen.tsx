@@ -20,18 +20,21 @@ const BankDetailsScreen = ({ navigation }: any) => {
   });
 
   // 1. Purani details load karein
+ 
+// 🎯 फिक्स 1: बिना किसी डिपेंडेंसी लूप के शुरुआती प्रोफाइल डेटा को सिंक करना भाई
   useEffect(() => {
     if (user) {
-      setBankInfo({
-        ...bankInfo,
+      setBankInfo(prev => ({
+        ...prev,
+        accountHolder: user.accountHolderName || user.name || '', // अगर बैंक होल्डर नाम न हो तो सेलर का नाम फॉलबैक भाई
         bankAccountNumber: user.bankAccountNumber || '',
         confirmAccountNumber: user.bankAccountNumber || '',
         ifscCode: user.ifscCode || '',
-      });
+        bankName: user.bankName || ''
+      }));
       setInitialLoading(false);
     }
   }, [user]);
-
   const handleIFSCChange = async (val: string) => {
     const ifsc = val.toUpperCase();
     setBankInfo({ ...bankInfo, ifscCode: ifsc });
@@ -48,8 +51,13 @@ const BankDetailsScreen = ({ navigation }: any) => {
       }
     }
   };
-
+// 🎯 फिक्स 2: अकाउंट होल्डर नेम और बैंक नेम के साथ 100% फुलप्रूफ पेलोड इंजन भाई
   const handleSave = async () => {
+    if (!bankInfo.accountHolder) {
+      Alert.alert("Missing Info", "Account Holder ka naam likhna zaroori hai.");
+      return;
+    }
+
     if (!bankInfo.bankAccountNumber || !bankInfo.ifscCode) {
       Alert.alert("Missing Info", "Account Number aur IFSC Code zaroori hain.");
       return;
@@ -62,16 +70,18 @@ const BankDetailsScreen = ({ navigation }: any) => {
 
     setLoading(true);
     try {
-      // ✅ Schema ke hisaab se payload
+      // ✅ सुधरा हुआ पेलोड: अब डेटाबेस की सारी फील्ड्स एक बार में लॉक हो जाएँगी भाई
       const payload = {
+        accountHolderName: bankInfo.accountHolder, // 👈 यह सबसे जरूरी चाबी थी भाई
         bankAccountNumber: bankInfo.bankAccountNumber,
         ifscCode: bankInfo.ifscCode,
+        bankName: bankInfo.bankName || 'Unknown Bank' // Razorpay से आया हुआ बैंक नाम भाई
       };
 
-      // ✅ Update via profile endpoint
+      // आपके सुधरे हुए वेंडर प्रोफाइल प्रोफाइल एंडपॉइंट पर पैच रिक्वेस्ट भाई
       await api.patch(`/api/sellers/profile/me`, payload);
       
-      Alert.alert("Success ✅", "Bank details settlement ke liye save ho gayi hain!");
+      Alert.alert("Success ✅", "Bank details settlement ke liye save ho gayi hain भाई!");
       navigation.goBack();
     } catch (error: any) {
       Alert.alert("Error", error.response?.data?.message || "Failed to save bank details");

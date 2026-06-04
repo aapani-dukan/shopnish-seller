@@ -13,65 +13,82 @@ export default function InventoryScreen({ navigation }: any) {
   const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
+ // 🎯 फिक्स: वैरिएंट्स एरे को सेफ़ली सिंक करने वाला डेटा फेचर भाई
   const fetchProducts = useCallback(async () => {
-  try {
-    // 1. पाथ को सही किया (/api जोड़ा)
-    const response = await api.get('/api/products/seller'); 
-    
-    // 2. डेटा हैंडलिंग (चेक करें कि रिस्पॉन्स में products है या सीधा एरे)
-    const data = response.data.products || response.data;
-    setProducts(data);
-  } catch (err: any) {
-    console.error("Inventory Fetch Error:", err.response?.status);
-    if(err.response?.status === 404) {
-       Alert.alert("Error", "Backend path nahi mila. Please /api check karein.");
-    }
-  } finally {
-    setLoading(false);
-    setRefreshing(false);
-  }
-}, []);
-// 3. टॉगल स्टॉक फंक्शन (Zomato जैसा "Quick Stock Update")
-const toggleStock = async (id: string, currentName: string, currentStock: number) => {
-  // Hum Alert.prompt use kar sakte hain (iOS/Android custom logic) 
-  // ya fir ek simple prompt
-  Alert.prompt(
-    "Update Stock",
-    `${currentName} ka naya stock likhein:`,
-    [
-      {
-        text: "Cancel",
-        style: "cancel"
-      },
-      {
-        text: "Update",
-        onPress: async (newStockValue) => {
-          const stockNum = Number(newStockValue);
-          
-          if (isNaN(stockNum) || stockNum < 0) {
-            Alert.alert("Error", "Kripya sahi number daalein");
-            return;
-          }
+    try {
+      const response = await api.get('/api/products/seller'); 
+      const data = response.data.products || response.data || [];
+      
+      // डेटाबेस से आने वाले हर प्रोडक्ट के वैरिएंट्स को सेफ़ली चेक कर लेते हैं भाई
+      const normalizedData = data.map((prod: any) => {
+        const variantsList = prod.variants || [];
+        
+        // सबसे पहला वैरिएंट हमारा बेस वैरिएंट होगा भाई
+        const baseVariant = variantsList[0] || { price: 0, stock: 0, id: null };
+        
+        // दुकान की टोटल यूनिट्स निकालने के लिए सारे वैरिएंट्स का स्टॉक जोड़ लो भाई
+        const totalStock = variantsList.reduce((sum: number, v: any) => sum + Number(v.stock || 0), 0);
 
-          try {
-            // Backend call jo humne pehle fix ki thi
-            await api.patch(`/api/products/${id}`, { stock: stockNum });
+        return {
+          ...prod,
+          // फ्लैट कीज बना दी भाई ताकि नीचे यूआई रेंडरर को ज्यादा मेहनत न करनी पड़े
+          baseVariantId: baseVariant.id, 
+          displayPrice: baseVariant.price || prod.price || 0,
+          calculatedStock: totalStock,
+          baseVariantQty: `${baseVariant.quantityValue || '1'} ${baseVariant.unit || 'piece'}`
+        };
+      });
+
+      setProducts(normalizedData);
+    } catch (err: any) {
+      console.error("Inventory Fetch Error:", err.response?.status);
+      if(err.response?.status === 404) {
+         Alert.alert("Error", "Backend path nahi mila. Please /api check karein.");
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+// 🎯 फिक्स: प्रोडक्ट आईडी के साथ बेस वैरिएंट आईडी को भी सिंक किया भाई ताकि स्टॉक सही जगह अपडेट हो!
+  const toggleStock = async (id: string, variantId: string | null, currentName: string, currentStock: number) => {
+    const targetId = variantId || id; // अगर वैरिएंट आईडी न हो तो सेफ़्टी के लिए प्रोडक्ट आईडी भाई
+    
+    Alert.prompt(
+      "Update Stock",
+      `${currentName} ka naya stock likhein:`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Update",
+          onPress: async (newStockValue) => {
+            const stockNum = Number(newStockValue);
             
-            // ✅ SUCCESS FEEDBACK
-            Alert.alert("Success", "Stock update ho gaya hai");
-            fetchProducts(); // List refresh
-            
-          } catch (err) {
-            Alert.alert("Error", "Stock update nahi ho paya");
+            if (isNaN(stockNum) || stockNum < 0) {
+              Alert.alert("Error", "Kripya sahi number daalein");
+              return;
+            }
+
+            try {
+              // ✅ बैकएंड के नए वैरिएंट-अवेयर पैच एंडपॉइंट पर हिट मारो भाई
+              await api.patch(`/api/products/${id}`, { 
+                variantId: targetId,
+                stock: stockNum 
+              });
+              
+              Alert.alert("Success", "Stock update ho gaya hai भाई");
+              fetchProducts(); 
+              
+            } catch (err) {
+              Alert.alert("Error", "Stock update nahi ho paya");
+            }
           }
         }
-      }
-    ],
-    "plain-text",
-    currentStock.toString() // Default value purana stock dikhayega
-  );
-};
-
+      ],
+      "plain-text",
+      currentStock.toString()
+    );
+  };
   useEffect(() => { fetchProducts(); }, [fetchProducts]);
 
   const onRefresh = () => {
@@ -100,60 +117,54 @@ const toggleStock = async (id: string, currentName: string, currentStock: number
   const filteredProducts = products.filter(p => 
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
-// renderProduct function ke andar ye badlav karein:
+// 🎯 फिक्स: नए फ्लैट कीज के आधार पर यूआई मैपिंग भाई!
 const renderProduct = ({ item }: any) => {
-  const isOutOfStock = item.stock <= 0;
-  const isLowStock = item.stock > 0 && item.stock <= 5;
-  const statusColor = item.approvalStatus === 'approved' ? '#10b981' : '#f59e0b';
+  const itemStock = Number(item.calculatedStock ?? 0);
+  const isOutOfStock = itemStock <= 0;
+  const isLowStock = itemStock > 0 && itemStock <= 5;
   const stockColor = isOutOfStock ? '#ef4444' : isLowStock ? '#f59e0b' : '#10b981';
-
-  // URL cleaning logic
-  const imageUri = item.image && item.image.startsWith('http') && !item.image.includes('placehold')
-    ? item.image.trim().replace(/\(/g, '%28').replace(/\)/g, '%29').replace(/ /g, '%20')
-    : null;
 
   return (
     <View style={[styles.card, isOutOfStock && { backgroundColor: '#fdf2f2' }]}>
-     <View style={styles.imageContainer}>
-  {item.image ? (
-    <Image 
-      key={`prod-img-${item.id}`}
-      source={{ uri: item.image }} 
-      style={styles.prodImage} 
-      resizeMode="cover"
-      onLoad={() => console.log(`✅ PHOTO RENDERED: ${item.name}`)}
-      onError={() => console.log(`❌ PHOTO FAILED: ${item.name}`)}
-    />
-  ) : (
-    <View style={styles.fallbackView}>
-      {/* Humne Feather hata kar Material icon dala hai check karne ke liye */}
-      <Text style={{fontSize: 10, color: '#94a3b8'}}>No </Text>
-    </View>
-  )}
+      <View style={styles.imageContainer}>
+        {item.image ? (
+          <Image 
+            key={`prod-img-${item.id}`}
+            source={{ uri: item.image }} 
+            style={styles.prodImage} 
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={styles.fallbackView}>
+            <Text style={{fontSize: 10, color: '#94a3b8'}}>No Image</Text>
+          </View>
+        )}
 
-  {isOutOfStock && (
-    <View style={styles.outOfStockOverlay}>
-      <Text style={styles.outOfStockText}>SOLD OUT</Text>
-    </View>
-  )}
-</View>
+        {isOutOfStock && (
+          <View style={styles.outOfStockOverlay}>
+            <Text style={styles.outOfStockText}>SOLD OUT</Text>
+          </View>
+        )}
+      </View>
+      
       <View style={styles.info}>
         <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
-        <Text style={styles.price}>₹{Number(item.price).toLocaleString()}</Text>
+        {/* 🎯 बेस वैरिएंट की साइज/यूनिट स्क्रीन पर छोटी सी चमकेगी भाई (जैसे: 1 kg) */}
+        <Text style={{ fontSize: 11, color: '#64748b', fontWeight: '600' }}>({item.baseVariantQty})</Text>
+        <Text style={styles.price}>₹{Number(item.displayPrice).toLocaleString()}</Text>
         <View style={styles.stockRow}>
            <View style={[styles.modernBadge, { borderColor: stockColor + '40' }]}>
               <View style={[styles.dot, { backgroundColor: stockColor }]} />
-              <Text style={styles.stockText}>{isOutOfStock ? 'Out of Stock' : `${item.stock} Units`}</Text>
+              <Text style={styles.stockText}>{isOutOfStock ? 'Out of Stock' : `${itemStock} Units`}</Text>
            </View>
         </View>
       </View>
 
       <View style={styles.actionsColumn}>
-
-        {/* Quick Stock Refill Button (Zomato Style) */}
+        {/* Quick Stock Refill Button */}
         <TouchableOpacity 
           style={styles.iconCircle} 
-         onPress={() => toggleStock(item.id, item.name, item.stock)}
+          onPress={() => toggleStock(item.id, item.baseVariantId, item.name, itemStock)}
         >
           <Feather name="refresh-cw" size={16} color="#1e40af" />
         </TouchableOpacity>
@@ -164,16 +175,18 @@ const renderProduct = ({ item }: any) => {
         >
           <Feather name="edit-2" size={16} color="#1e40af" />
         </TouchableOpacity>
+        
         <TouchableOpacity 
-  style={[styles.iconCircle, { backgroundColor: isLowStock ? '#fff7ed' : '#f0fdf4' }]} 
-  onPress={() => toggleStock(item.id, item.name, item.stock)} // ✅ Updated call
->
-  <Feather 
-    name="plus-circle" 
-    size={18} 
-    color={isLowStock ? '#ea580c' : '#16a34a'} 
-  />
-</TouchableOpacity>
+          style={[styles.iconCircle, { backgroundColor: isLowStock ? '#fff7ed' : '#f0fdf4' }]} 
+          onPress={() => toggleStock(item.id, item.baseVariantId, item.name, itemStock)} 
+        >
+          <Feather 
+            name="plus-circle" 
+            size={18} 
+            color={isLowStock ? '#ea580c' : '#16a34a'} 
+          />
+        </TouchableOpacity>
+        
         <TouchableOpacity 
           style={[styles.iconCircle, { backgroundColor: '#fef2f2' }]} 
           onPress={() => deleteProduct(item.id)}

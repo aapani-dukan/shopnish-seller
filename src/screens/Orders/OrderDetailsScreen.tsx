@@ -63,7 +63,10 @@ const updateStatus = async (newStatus: string) => {
       <Text style={{ marginTop: 10, color: '#64748b' }}>Fetching Order...</Text>
     </View>
   );
-
+// 🎯 जादुई लॉग: यह सेलर ऐप के मेट्रो बंडलर में डेटा का असली ढांचा (Structure) छाप देगा
+console.log("====== 📦 SELLER ORDER DATA START ======");
+console.log(JSON.stringify(order, null, 2));
+console.log("====== 📦 SELLER ORDER DATA END ======");
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
@@ -77,105 +80,140 @@ const updateStatus = async (newStatus: string) => {
            <Text style={styles.subText}>Sub-Order: #{order?.subordernumber}</Text>
         </View>
 
-       {/* Action Buttons Section */}
-<View style={styles.card}>
-  <Text style={styles.sectionTitle}>Customer & Delivery</Text>
-  <View style={styles.customerRow}>
-    <View style={styles.customerInfo}>
-      <Text style={styles.customerName}>{order?.customerName || 'Customer'}</Text>
-      <Text style={styles.customerPhone}>{order?.customerPhone || '+91 00000 00000'}</Text>
-    </View>
-    <View style={styles.iconRow}>
-      {/* 📞 Call Button */}
-      <TouchableOpacity 
-        style={[styles.circleBtn, { backgroundColor: '#10b981' }]} 
-        onPress={() => Linking.openURL(`tel:${order?.customerPhone}`)}
-      >
-        <Feather name="phone" size={20} color="#fff" />
-      </TouchableOpacity>
+{/* Action Buttons Section - 🎯 फिक्स: JSON एड्रेस पार्सिंग और कड़क सुरक्षा के साथ भाई! */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Customer & Delivery</Text>
+          <View style={styles.customerRow}>
+            <View style={styles.customerInfo}>
+              <Text style={styles.customerName}>{order?.customerName || 'Customer'}</Text>
+              <Text style={styles.customerPhone}>{order?.customerPhone || '+91 00000 00000'}</Text>
+            </View>
+            <View style={styles.iconRow}>
+              {/* 📞 Call Button */}
+              <TouchableOpacity 
+                style={[styles.circleBtn, { backgroundColor: '#10b981' }]} 
+                onPress={() => Linking.openURL(`tel:${order?.customerPhone}`)}
+              >
+                <Feather name="phone" size={20} color="#fff" />
+              </TouchableOpacity>
 
-      {/* 💬 WhatsApp Button with Pre-filled Message */}
-      <TouchableOpacity 
-        style={[styles.circleBtn, { backgroundColor: '#3b82f6' }]} 
-        onPress={() => {
-          const customerPhone = order?.customerPhone || '';
-          const orderNum = order?.subOrderNumber || order?.subordernumber || 'N/A';
-          const customerName = order?.customerName || 'Customer';
-          
-          // Professional Message Logic
-          const msg = `नमस्ते ${customerName}, मैं Shopnish से आपका स्टोर पार्टनर बोल रहा हूँ। आपके ऑर्डर #${orderNum} के बारे में कुछ जानकारी चाहिए थी।`;
-          const url = `whatsapp://send?phone=91${customerPhone}&text=${encodeURIComponent(msg)}`;
-          
-          Linking.openURL(url).catch(() => {
-            Alert.alert("Error", "WhatsApp आपके फोन में इंस्टॉल नहीं है।");
-          });
-        }}
-      >
-        <Feather name="message-circle" size={20} color="#fff" />
-      </TouchableOpacity>
-    </View>
-  </View>
-          <TouchableOpacity 
-            style={styles.addressBox} 
-            onPress={() => openMap(`${order?.deliveryAddress?.addressLine1}, ${order?.deliveryAddress?.city}`)}
-          >
-            <View style={styles.mapIconBox}>
-              <Feather name="map" size={18} color="#1e40af" />
+              {/* 💬 WhatsApp Button */}
+              <TouchableOpacity 
+                style={[styles.circleBtn, { backgroundColor: '#3b82f6' }]} 
+                onPress={() => {
+                  const customerPhone = order?.customerPhone || '';
+                  const orderNum = order?.subOrderNumber || order?.subordernumber || 'N/A';
+                  const customerName = order?.customerName || 'Customer';
+                  
+                  const msg = `नमस्ते ${customerName}, मैं Shopnish से आपका स्टोर पार्टनर बोल रहा हूँ। आपके ऑर्डर #${orderNum} के बारे में कुछ जानकारी चाहिए थी।`;
+                  const url = `whatsapp://send?phone=91${customerPhone}&text=${encodeURIComponent(msg)}`;
+                  
+                  Linking.openURL(url).catch(() => {
+                    Alert.alert("Error", "WhatsApp आपके फोन में इंस्टॉल नहीं है।");
+                  });
+                }}
+              >
+                <Feather name="message-circle" size={20} color="#fff" />
+              </TouchableOpacity>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.addressText} numberOfLines={2}>
-                {order?.deliveryAddress?.addressLine1}, {order?.deliveryAddress?.city} - {order?.deliveryAddress?.pincode}
-              </Text>
-              <Text style={styles.mapLinkText}>Tap to open Maps</Text>
-            </View>
-          </TouchableOpacity>
+          </View>
+
+          {/* 🎯 जादुई सेफ़्टी लेयर: स्ट्रिंग एड्रेस को पार्स करके फ्लैट कीज निकालना भाई */}
+          {(() => {
+            let addressLine = "Local Address";
+            let city = "Bundi";
+            let pincode = "";
+
+            if (order?.deliveryAddress) {
+              if (typeof order.deliveryAddress === 'string') {
+                try {
+                  const parsed = JSON.parse(order.deliveryAddress);
+                  addressLine = parsed.addressLine1 || parsed.address || addressLine;
+                  if (parsed.addressLine2) addressLine += `, ${parsed.addressLine2}`;
+                  city = parsed.city || city;
+                  pincode = parsed.pincode || parsed.postalCode || "";
+                } catch (e) {
+                  addressLine = order.deliveryAddress; // फॉलबैक अगर पहले से स्ट्रिंग हो भाई
+                }
+              } else if (typeof order.deliveryAddress === 'object') {
+                addressLine = order.deliveryAddress.addressLine1 || addressLine;
+                city = order.deliveryAddress.city || city;
+                pincode = order.deliveryAddress.pincode || "";
+              }
+            }
+
+            const fullAddressString = `${addressLine}, ${city} ${pincode}`.trim();
+
+            return (
+              <TouchableOpacity 
+                style={styles.addressBox} 
+                onPress={() => openMap(fullAddressString)}
+              >
+                <View style={styles.mapIconBox}>
+                  <Feather name="map" size={18} color="#1e40af" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.addressText} numberOfLines={2}>
+                    {fullAddressString}
+                  </Text>
+                  <Text style={styles.mapLinkText}>Tap to open Maps</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })()}
         </View>
-{/* Items in this Order Section */}
-<View style={styles.card}>
-  <Text style={styles.sectionTitle}>Items in this Order</Text>
-{order?.items && order.items.length > 0 ? (
-    order.items.map((item: any, index: number) => (
-      <View key={index} style={styles.itemRow}>
-        <View style={styles.qtyBadge}>
-          <Text style={styles.qtyText}>{item.quantity}x</Text>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.productName}>{item.productName}</Text>
-         <Text style={styles.unitText}>{String(item.unit || 'unit')}</Text>
-        </View>
-        <Text style={styles.priceText}>₹{item.itemTotal}</Text>
-      </View>
-    ))
-  ) : (
-    <Text style={{ textAlign: 'center', margin: 10 }}>No items found in this order.</Text>
-  )}
+{/* Items in this Order Section - 🎯 फिक्स: वैरिएंट साइज डिस्प्ले के साथ भाई! */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Items in this Order</Text>
+          {order?.items && order.items.length > 0 ? (
+            order.items.map((item: any, index: number) => {
+              // वैरिएंट का नाम या साइज निकालने का कड़क लॉजिक भाई
+              const variantInfo = item.variantName || item.variantTitle || item.unit || '';
+              
+              return (
+                <View key={index} style={styles.itemRow}>
+                  <View style={styles.qtyBadge}>
+                    <Text style={styles.qtyText}>{item.quantity}x</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.productName}>{item.productName}</Text>
+                    {variantInfo ? (
+                      <Text style={[styles.unitText, { color: '#1e40af', fontWeight: '700' }]}>
+                        वैरिएंट: {String(variantInfo)}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <Text style={styles.priceText}>₹{item.itemTotal}</Text>
+                </View>
+              );
+            })
+          ) : (
+            <Text style={{ textAlign: 'center', margin: 10 }}>No items found in this order.</Text>
+          )}
   
-  
-  {/* 🎯 जादुई सुधार: बैकएंड पर निर्भर रहे बिना, आइटम्स की प्राइस को खुद कैलकुलेट करेंगे */}
-{/* 🎯 फाइनल और सटीक फिक्स: कोई गलत फॉलबैक गणित नहीं, सिर्फ रीयल सबटोटल */}
+  {/* 🎯 आपके कहे अनुसार: केवल आइटम की राशियों (itemTotal) को आपस में जोड़ने वाला सटीक फंक्शन */}
 {(() => {
-  const itemsList = order?.items || order?.subOrders || [];
-  let calculatedSubtotal = 0;
-  
+  // 1. लॉग्स के अनुसार सीधे 'order.items' से लिस्ट निकाली
+  const itemsList = order?.items || [];
+  let pureItemsTotal = 0;
+
+  // 2. लूप चलाकर केवल 'itemTotal' की राशियों को आपस में जोड़ दिया
   if (itemsList && itemsList.length > 0) {
     itemsList.forEach((singleItem: any) => {
-      // आइटम की असली कीमत जोड़ना
-      calculatedSubtotal += Number(singleItem?.price || singleItem?.itemPrice || singleItem?.total || 0);
+      pureItemsTotal += Number(singleItem?.itemTotal || 0);
     });
   }
 
-  // 🚨 अगर ऊपर लूप से प्राइस मिल गई तो वही दिखाएंगे (यानी 250 + 250 = 500)
-  // अगर लूप खाली रहा, तब सीधे order.subtotal या order.itemsPrice उठाएंगे, टोटल में से माइनस करने वाला लफड़ा बंद!
-  const finalBillAmount = calculatedSubtotal > 0 
-    ? calculatedSubtotal 
-    : Number(order?.subtotal || order?.itemsPrice || 500);
+  // 3. सुरक्षा फॉलबैक: अगर किसी वजह से एरे खाली हो, तो पुराना टोटल दिखाएगा (वरना हमेशा जोड़ ही दिखाएगा)
+  const finalDisplayAmount = pureItemsTotal > 0 ? pureItemsTotal : Number(order?.total || 0);
 
   return (
     <View style={styles.billContainer}>
       <View style={styles.billRow}>
         <Text style={styles.billLabel}>Order Total (माल की कीमत)</Text>
         <Text style={styles.grandTotalValue}>
-          ₹{Number(finalBillAmount).toFixed(2)}
+          {/* ₹250 + ₹250 को जोड़कर सीधे ₹500.00 दिखाएगा, डिलीवरी चार्ज का नामोनिशान खत्म */}
+          ₹{Number(finalDisplayAmount).toFixed(2)}
         </Text>
       </View>
       
@@ -188,6 +226,7 @@ const updateStatus = async (newStatus: string) => {
     </View>
   );
 })()}
+
 </View>
 <View style={[styles.card, { backgroundColor: '#f8fafc', borderStyle: 'dashed', borderWidth: 1, borderColor: '#cbd5e1' }]}>
     <Text style={styles.infoText}>

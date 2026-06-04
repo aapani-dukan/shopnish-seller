@@ -39,6 +39,7 @@ const SellerWallet = () => {
 
   useEffect(() => { fetchWalletData(); }, [fetchWalletData]);
 
+ // ✅ फिक्स: फ़ालतू कंडीशन हटाकर सीधे वॉलेट डेटा फेचर को डाल दिया भाई!
   const onRefresh = () => {
     setRefreshing(true);
     fetchWalletData();
@@ -123,31 +124,40 @@ const SellerWallet = () => {
             <Text style={{ color: '#94a3b8', fontStyle: 'italic' }}>Koi transaction nahi mili.</Text>
           </View>
         ) : (
-          walletData.transactions.map((tx: any) => (
-            <View key={tx.id} style={styles.txItem}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                {/* ✅ Type check matching backend: 'credit' or 'debit' */}
-                <View style={[styles.txIcon, { backgroundColor: tx.type === 'credit' ? '#f0fdf4' : '#fef2f2' }]}>
-                  {tx.type === 'credit' ? <ArrowUpRight color="#16a34a" size={20} /> : <ArrowDownLeft color="#dc2626" size={20} />}
+          walletData.transactions.map((tx: any) => {
+            const isCredit = tx.type === 'credit' || tx.purpose === 'order_earning' || Number(tx.amount) > 0;
+            const displayDesc = tx.description || (tx.purpose === 'order_earning' ? 'ऑर्डर की कमाई (Order Earning)' : tx.purpose);
+
+            return (
+              <View key={tx.id} style={styles.txItem}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                  <View style={[styles.txIcon, { backgroundColor: isCredit ? '#f0fdf4' : '#fef2f2' }]}>
+                    {isCredit ? (
+                      <ArrowUpRight color="#16a34a" size={20} />
+                    ) : (
+                      <ArrowDownLeft color="#dc2626" size={20} />
+                    )}
+                  </View>
+                  <View style={{ marginLeft: 12, flex: 1 }}>
+                    <Text style={styles.txDesc} numberOfLines={1}>{displayDesc}</Text>
+                    <Text style={styles.txDate}>
+                      {tx.createdAt 
+                        ? new Date(tx.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) 
+                        : 'N/A'}
+                    </Text>
+                  </View>
                 </View>
-                <View style={{ marginLeft: 12, flex: 1 }}>
-                  <Text style={styles.txDesc} numberOfLines={1}>{tx.description || tx.purpose}</Text>
-                  <Text style={styles.txDate}>
-                    {tx.createdAt ? new Date(tx.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : 'N/A'}
-                  </Text>
-                </View>
+                <Text style={[styles.txAmount, { color: isCredit ? '#16a34a' : '#dc2626' }]}>
+                  {isCredit ? '+' : '-'}₹{Math.abs(Number(tx.amount)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </Text>
               </View>
-              <Text style={[styles.txAmount, { color: tx.type === 'credit' ? '#16a34a' : '#dc2626' }]}>
-                {tx.type === 'credit' ? '+' : '-'}₹{Math.abs(Number(tx.amount)).toLocaleString('en-IN')}
-              </Text>
-            </View>
-          ))
+            );
+          })
         )}
-      </View>
-    </ScrollView>
+      </View> 
+    </ScrollView> 
   );
 };
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },

@@ -169,33 +169,39 @@ const updateStatusMutation = useMutation({
         <Text>Server Status: </Text>
         <Text>{isConnected ? "🟢 Online (Siren Ready)" : "🔴 Offline (Check Internet)"}</Text>
       </View>
-        {/* Recent Orders List */}
+      {/* Recent Orders List - 🎯 फिक्स: सब-ऑर्डर आईडी और सही प्राइजिंग की (Key) के साथ भाई! */}
         {dashboardData?.recentOrders?.length > 0 ? (
-          dashboardData.recentOrders.map((order: any) => (
-            <TouchableOpacity 
-              key={order.id} 
-              style={styles.orderCard} 
-              onPress={() => navigation.navigate('OrderDetails', { orderId: order.id })}
-            >
-              <View style={styles.orderLeft}>
-                <Text style={styles.orderId}>#{order.orderNumber || order.subOrderNumber}</Text>
-                <Text style={styles.orderCustomer}>{order.customerName}</Text>
-              </View>
-              <View style={styles.orderRight}>
-                <Text style={styles.orderAmount}>₹{Number(order.totalAmount || order.total).toFixed(2)}</Text>
-                <Text style={[styles.orderStatus, { color: order.status === 'pending' ? '#f59e0b' : '#3b82f6' }]}>
-                  {order.status?.replace('_', ' ').toUpperCase()}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))
+          dashboardData.recentOrders.map((order: any) => {
+            // 🎯 सेफ़्टी फॉलबैक: सही आईडी और आर्डर नंबर निकालना भाई
+            const targetOrderId = order.subOrderId || order.id;
+            const displayOrderNumber = order.subOrderNumber || order.orderNumber || order.subordernumber || order.id;
+            const displayAmount = Number(order.total || order.totalAmount || order.subtotal || 0);
+
+            return (
+              <TouchableOpacity 
+                key={order.id} 
+                style={styles.orderCard} 
+                onPress={() => navigation.navigate('OrderDetails', { orderId: targetOrderId })}
+              >
+                <View style={styles.orderLeft}>
+                  <Text style={styles.orderId}>#{displayOrderNumber}</Text>
+                  <Text style={styles.orderCustomer}>{order.customerName || 'Customer'}</Text>
+                </View>
+                <View style={styles.orderRight}>
+                  <Text style={styles.orderAmount}>₹{displayAmount.toFixed(2)}</Text>
+                  <Text style={[styles.orderStatus, { color: order.status === 'pending' ? '#f59e0b' : '#3b82f6' }]}>
+                    {order.status?.replace('_', ' ').toUpperCase()}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })
         ) : (
           <View style={styles.emptyState}>
             <Feather name="shopping-cart" size={40} color="#cbd5e1" />
             <Text style={styles.emptyText}>No recent orders.</Text>
           </View>
         )}
-
         {/* Quick Actions */}
         <View style={styles.quickActions}>
           <ActionButton onPress={() => navigation.navigate('AddProduct')} icon="plus-circle" label="Add Item" color="#001B3A" bg="#eef2ff" />

@@ -25,32 +25,31 @@ export default function OrdersScreen({ navigation }: any) {
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState('all');
 
+  // 🎯 फिक्स 1: बैकएंड के सही सब-ऑर्डर्स राउट (/api/sellers/sub-orders) से डेटा खींचना भाई!
   const fetchOrders = useCallback(async () => {
-  try {
-    // ✅ URL को बैकएंड के राउट से मैच किया (api/sellers/orders)
-    const response = await api.get('/api/sellers/orders'); 
-    
-    // ✅ आपका बैकएंड सीधा Array भेज रहा है, इसलिए response.data का उपयोग करें
-    const rawData = Array.isArray(response.data) ? response.data : [];
+    try {
+      // आपके सुधरे हुए वेंडर-स्पेसिफिक सब-ऑर्डर एंडपॉइंट पर हिट मारो भाई
+      const response = await api.get('/api/sellers/sub-orders'); 
+      
+      const rawData = Array.isArray(response.data) 
+        ? response.data 
+        : (response.data.subOrders || response.data.orders || []);
 
-    // Latest orders ऊपर दिखाने के लिए (createdat को चेक करें, आपके DB में createdAt हो सकता है)
-    const sortedOrders = rawData.sort((a: any, b: any) => 
-      new Date(b.createdAt || b.createdat).getTime() - new Date(a.createdAt || a.createdat).getTime()
-    );
-    
-    setOrders(sortedOrders);
-  } catch (err: any) {
-  // यह लाइन आपको बताएगी कि मोबाइल ऐप ने किस URL पर रिक्वेस्ट भेजी थी
-  console.log("❌ Full Request URL:", err.config?.baseURL + err.config?.url);
-  console.log("❌ Status Code:", err.response?.status);
-  console.error('Failed to fetch orders:', err);
-
-  } finally {
-    setLoading(false);
-    setRefreshing(false);
-  }
-}, []);
-
+      // Latest orders ऊपर दिखाने के लिए डेट सॉर्टिंग भाई
+      const sortedOrders = rawData.sort((a: any, b: any) => 
+        new Date(b.createdAt || b.createdat).getTime() - new Date(a.createdAt || a.createdat).getTime()
+      );
+      
+      setOrders(sortedOrders);
+    } catch (err: any) {
+      console.log("❌ Full Request URL:", err.config?.baseURL + err.config?.url);
+      console.log("❌ Status Code:", err.response?.status);
+      console.error('Failed to fetch orders:', err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
   // Status Update Function
@@ -111,54 +110,54 @@ const renderOrderItem = ({ item }: any) => {
           </View>
         </View>
 
-        {/* Action Buttons Logic */}
-       <View style={styles.cardFooter}>
-          {/* 🎯 केवल प्राइस वाला हिस्सा बदला: बैकएंड के 'item.total' पर निर्भर रहे बिना, आइटम्स का जोड़ निकाला */}
+       {/* Action Elements - 🎯 फिक्स 2: 'itemTotal' की राशियों का शुद्ध जोड़ निकालने वाला कड़क लॉजिक भाई */}
+        <View style={styles.cardFooter}>
           {(() => {
-            const itemsList = item?.items || item?.subOrders || [];
+            const itemsList = item?.items || [];
             let calculatedSubtotal = 0;
             
             if (itemsList && itemsList.length > 0) {
               itemsList.forEach((singleItem: any) => {
-                calculatedSubtotal += Number(singleItem?.price || singleItem?.itemPrice || singleItem?.total || 0);
+                // 🎯 फिक्स: सब-ऑर्डर के आइटम्स में कुल राशि हमेशा 'itemTotal' में पैक होकर आती है भाई!
+                calculatedSubtotal += Number(singleItem?.itemTotal || singleItem?.total || 0);
               });
             }
 
-            // अगर लूप से अमाउंट मिला तो वो, नहीं तो सीधे subtotal का फॉलबैक (ताकि 550 न आए)
+            // अगर लूप से अमाउंट मिला तो वो, नहीं तो पैरेंट का 'total' या 'subtotal' फॉलबैक भाई
             const finalCardAmount = calculatedSubtotal > 0 
               ? calculatedSubtotal 
-              : Number(item?.subtotal || item?.itemsPrice || 500);
+              : Number(item?.total || item?.subtotal || 0);
 
             return (
-              <Text style={styles.orderTotal}>₹{Number(finalCardAmount).toLocaleString()}</Text>
+              <Text style={styles.orderTotal}>₹{Number(finalCardAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
             );
           })()}
           
           <View style={styles.actionRow}>
             {item.status === 'pending' && (
               <TouchableOpacity 
-                style={[styles.miniBtn, { backgroundColor: '#10b981' }]} // Accept green behtar hai
+                style={[styles.miniBtn, { backgroundColor: '#10b981' }]} 
                 onPress={() => updateStatus(item.id, 'accepted')}
               >
                 <Text style={styles.miniBtnText}>Accept</Text>
               </TouchableOpacity>
             )}
-              {item.status === 'accepted' && (
-                <TouchableOpacity 
-                  style={[styles.miniBtn, { backgroundColor: '#8b5cf6' }]}
-                  onPress={() => updateStatus(item.id, 'ready_for_pickup')}
-                >
-                  <Text style={styles.miniBtnText}>Pack Done</Text>
-                </TouchableOpacity>
-              )}
+            {item.status === 'accepted' && (
               <TouchableOpacity 
-                style={styles.detailBtn}
-                onPress={() => navigation.navigate('OrderDetails', { orderId: item.id })}
+                style={[styles.miniBtn, { backgroundColor: '#8b5cf6' }]}
+                onPress={() => updateStatus(item.id, 'ready_for_pickup')}
               >
-                <Feather name="chevron-right" size={20} color="#64748b" />
+                <Text style={styles.miniBtnText}>Pack Done</Text>
               </TouchableOpacity>
-            </View>
+            )}
+            <TouchableOpacity 
+              style={styles.detailBtn}
+              onPress={() => navigation.navigate('OrderDetails', { orderId: item.id })}
+            >
+              <Feather name="chevron-right" size={20} color="#64748b" />
+            </TouchableOpacity>
           </View>
+        </View>
         </TouchableOpacity>
       </View>
     );

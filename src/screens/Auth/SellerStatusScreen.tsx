@@ -28,9 +28,10 @@ export default function SellerStatusScreen({ navigation }: any) {
     btnText: "",
     action: () => {}
   };
-
-  const status = user?.sellerProfile?.approvalStatus;
+// 🎯 फिक्स: बैकएंड ऑथ पेलोड के साथ 100% सिंक! प्रोफाइल और पैरेंट दोनों पाथ का फॉलबैक लगा दिया भाई
+  const status = user?.approvalStatus || user?.seller?.approvalStatus || user?.sellerProfile?.approvalStatus;
   const role = user?.role;
+  const rejectionReason = user?.rejectionReason || user?.seller?.rejectionReason || user?.sellerProfile?.rejectionReason;
 
   if (!isAuthenticated) {
     config = {
@@ -59,10 +60,11 @@ export default function SellerStatusScreen({ navigation }: any) {
       btnText: "Contact Support",
       action: () => {} // WhatsApp या Call Support
     };
-  } else if (role === "seller" && status === "rejected") {
+ } else if (role === "seller" && status === "rejected") {
     config = {
       title: "Application Rejected",
-      desc: `Reason: ${user?.sellerProfile?.rejectionReason || 'Criteria not met.'}`,
+      // 🎯 फिक्स: ऊपर डिक्लेयर किए गए सुधरे हुए वेरिएबल का इस्तेमाल भाई
+      desc: `Reason: ${rejectionReason || 'Criteria not met.'}`,
       icon: "x-circle",
       color: "#ef4444",
       btnText: "Re-apply Now",

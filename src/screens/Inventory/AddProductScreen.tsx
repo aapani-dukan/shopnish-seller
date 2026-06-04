@@ -25,7 +25,8 @@ export default function AddProductScreen({ navigation }: any) {
   
   // Manual Mode State
   const [manualData, setManualData] = useState({
-    name: '', price: '', stock: '', description: '', categoryId: '', image: ''
+    name: '', price: '', stock: '', description: '', categoryId: '', image: '',quantityValue: '1',
+    unit: 'piece'
   });
 
   // 1. Fetch Categories (Web logic)
@@ -58,13 +59,20 @@ export default function AddProductScreen({ navigation }: any) {
     return () => clearTimeout(timer);
   }, [selectedCat, searchTerm, mode]);
 
-  // 3. Catalog Selection Toggle
+  // 3. Catalog Selection Toggle (वैरिएंट-अवेयर मोड भाई)
   const toggleItem = (item: any) => {
     const newItems = { ...selectedItems };
     if (newItems[item.id]) {
       delete newItems[item.id];
     } else {
-      newItems[item.id] = { ...item, price: '', stock: '10' };
+      // 🎯 फिक्स: फ्लैट प्राइस/स्टॉक के बजाय अंदर एक वैरिएंट की शुरुआती वैल्यू सेट कर दी भाई
+      newItems[item.id] = { 
+        ...item, 
+        variantPrice: '', 
+        variantStock: '10',
+        variantUnit: item.unit || 'piece',
+        variantQty: '1'
+      };
     }
     setSelectedItems(newItems);
   };
@@ -97,88 +105,90 @@ export default function AddProductScreen({ navigation }: any) {
     }
   }
 };
-  // 5. Submit Handler (Industrial Grade)
-const handleSubmit = async () => {
-  setLoading(true);
-
-  try {
-    if (mode === 'catalog') {
-      const selectedArray = Object.values(selectedItems);
-      if (selectedArray.length === 0) {
-        throw new Error("Kripya kam se kam ek product select karein.");
-      }
-
-      const payload = selectedArray.map((item: any) => {
-        const price = Number(item.price);
-        const stock = Number(item.stock);
-
-        if (!price || price <= 0) {
-          throw new Error(`${item.name} ka price sahi nahi hai.`);
+  // 5. Submit Handler (वैरिएंट-अवेयर इंडस्ट्रियल ग्रेड भाई)
+  const handleSubmit = async () => {
+    setLoading(true);
+    try {
+      if (mode === 'catalog') {
+        const selectedArray = Object.values(selectedItems);
+        if (selectedArray.length === 0) {
+          throw new Error("Kripya kam se kam ek product select karein.");
         }
 
-        return {
-          masterProductId: item.id,
-          name: item.name,
-          image: item.image, 
-          categoryId: item.categoryId,
-          price: price,
-          stock: stock || 0,
-          isActive: true,
-          // ✅ Backend ko bolo ise turant live kare
-          approvalStatus: 'approved', 
-        };
-      });
+        const payload = selectedArray.map((item: any) => {
+          const price = Number(item.variantPrice);
+          const stock = Number(item.variantStock);
 
-      await api.post('/api/products/bulk', { products: payload });
+          if (!price || price <= 0) {
+            throw new Error(`${item.name} ka price sahi nahi hai.`);
+          }
 
-    } else {
-      // --- MANUAL MODE (Dal Makhani Logic) ---
-      if (!manualData.name || manualData.name.length < 3) throw new Error("Naam chota hai.");
-      
-      // Agar image wahi camera icon hai ya khali hai toh roko
-      if (!manualData.image || manualData.image.includes('no-image-icon')) {
-        throw new Error("Kripya asli photo upload karein, camera icon nahi.");
-      }
-      
-      if (!manualData.categoryId) throw new Error("Category chunna zaroori hai.");
-      
-      const price = Number(manualData.price);
-      const stock = Number(manualData.stock);
+          return {
+            masterProductId: item.id,
+            name: item.name,
+            image: item.image, 
+            categoryId: item.categoryId,
+            isActive: true,
+            approvalStatus: 'approved', 
+            // 🎯 फिक्स: बैकएंड के नए आर्किटेक्चर के लिए वैरिएंट्स एरे बंडल भाई!
+            variants: [{
+              quantityValue: String(item.variantQty || "1"),
+              unit: item.variantUnit || "piece",
+              price: price,
+              stock: stock || 0
+            }]
+          };
+        });
 
-      if (isNaN(price) || price <= 0) throw new Error("Sahi Price likhein.");
+        // यह सीधे आपके सुधरे हुए bulkCreateProducts एंडपॉइंट पर हिट करेगा भाई!
+        await api.post('/api/products/bulk', { products: payload });
 
-      const finalManualData = {
-        ...manualData,
-        price: price,
-        stock: stock,
-        isActive: true,
-        approvalStatus: 'approved', // ✅ Taaki Customer App par turant dikhe
+      } else {
+        // --- MANUAL MODE (दाल मखनी लॉजिक अपग्रेड भाई) ---
+        if (!manualData.name || manualData.name.length < 3) throw new Error("Naam chota hai.");
+        if (!manualData.image || manualData.image.includes('no-image-icon')) {
+          throw new Error("Kripya asli photo upload karein, camera icon nahi.");
+        }
+        if (!manualData.categoryId) throw new Error("Category chunna zaroori hai.");
         
-        /* Bhai Yahan Dhyan De: 
-           Backend mein agar product ke saath location nahi ja rahi, 
-           toh Customer App use filter nahi kar payegi. 
-           Backend ko ye data Seller ki profile se khud uthana chahiye.
-        */
-      };
+        const price = Number(manualData.price);
+        const stock = Number(manualData.stock);
 
-      await api.post('/api/products', finalManualData);
+        if (isNaN(price) || price <= 0) throw new Error("Sahi Price likhein.");
+
+        // 🎯 फिक्स: मैनुअल प्रोडक्ट क्रिएशन एंडपॉइंट के लिए भी बेस वैरिएंट का बंडल अनिवार्य है भाई!
+        const finalManualData = {
+          name: manualData.name,
+          description: manualData.description || "",
+          categoryId: Number(manualData.categoryId),
+          image: manualData.image,
+          isActive: true,
+          approvalStatus: 'approved',
+          variants: [{
+            quantityValue: "1", // मैनुअल सिंगल प्रोडक्ट के लिए डिफ़ॉल्ट 1 piece भाई
+            unit: "piece",
+            price: price,
+            stock: stock || 0
+          }]
+        };
+
+        await api.post('/api/products', finalManualData);
+      }
+
+      Alert.alert(
+        "Success 🎉", 
+        mode === 'catalog' ? "Inventory Update Ho Gayi!" : "Product Live Ho Gaya!",
+        [{ text: "Theek Hai", onPress: () => navigation.goBack() }]
+      );
+
+    } catch (err: any) {
+      console.error("Submit Error:", err);
+      const errorMessage = err.response?.data?.message || err.message || "Submit fail ho gaya.";
+      Alert.alert("Error", errorMessage);
+    } finally {
+      setLoading(false);
     }
-
-    Alert.alert(
-      "Success 🎉", 
-      mode === 'catalog' ? "Inventory Update Ho Gayi!" : "Product Live Ho Gaya!",
-      [{ text: "Theek Hai", onPress: () => navigation.goBack() }]
-    );
-
-  } catch (err: any) {
-    console.error("Submit Error:", err);
-    const errorMessage = err.response?.data?.message || err.message || "Submit fail ho gaya.";
-    Alert.alert("Error", errorMessage);
-  } finally {
-    setLoading(false);
-  }
-};
-
+  };
   const renderMasterItem = ({ item }: any) => {
     const isSelected = !!selectedItems[item.id];
     return (
@@ -210,6 +220,7 @@ const handleSubmit = async () => {
           </TouchableOpacity>
         </View>
         
+       
         {isSelected && (
           <View style={styles.selectionInputs}>
             <View style={styles.miniInputGroup}>
@@ -218,7 +229,11 @@ const handleSubmit = async () => {
                 style={styles.miniInput} 
                 placeholder="0.00" 
                 keyboardType="numeric" 
-                onChangeText={(v) => setSelectedItems({...selectedItems, [item.id]: {...selectedItems[item.id], price: v}})}
+                value={selectedItems[item.id]?.variantPrice}
+                onChangeText={(v) => setSelectedItems({
+                  ...selectedItems, 
+                  [item.id]: { ...selectedItems[item.id], variantPrice: v }
+                })}
               />
             </View>
             <View style={styles.miniInputGroup}>
@@ -227,15 +242,18 @@ const handleSubmit = async () => {
                 style={styles.miniInput} 
                 placeholder="10" 
                 keyboardType="numeric"
-                onChangeText={(v) => setSelectedItems({...selectedItems, [item.id]: {...selectedItems[item.id], stock: v}})}
+                value={selectedItems[item.id]?.variantStock}
+                onChangeText={(v) => setSelectedItems({
+                  ...selectedItems, 
+                  [item.id]: { ...selectedItems[item.id], variantStock: v }
+                })}
               />
             </View>
           </View>
         )}
-      </View>
-    );
-  };
-
+</View>
+  );
+};
   return (
     <View style={styles.container}>
       {/* Header Tabs */}
@@ -301,7 +319,7 @@ const handleSubmit = async () => {
           />
         </View>
       ) : (
-        <ScrollView style={styles.manualForm} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+       <ScrollView style={styles.manualForm} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
           <TouchableOpacity style={styles.imageUpload} onPress={handleImagePick}>
             {manualData.image ? (
               <Image source={{ uri: manualData.image }} style={styles.uploadedImg} />
@@ -319,6 +337,7 @@ const handleSubmit = async () => {
           <Text style={styles.fieldLabel}>DESCRIPTION</Text>
           <TextInput style={[styles.fullInput, { height: 100 }]} multiline placeholder="Tell buyers about this product..." onChangeText={(v) => setManualData({...manualData, description: v})} />
 
+          {/* 🎯 फिक्स: प्राइस और स्टॉक इनपुट रो भाई */}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
             <View style={{ width: '48%' }}>
               <Text style={styles.fieldLabel}>PRICE (₹)</Text>
@@ -330,20 +349,43 @@ const handleSubmit = async () => {
             </View>
           </View>
 
-         <Text style={styles.fieldLabel}>CATEGORY</Text>
-<ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScrollManual}>
-  {categories.map((c: any) => (
-    <TouchableOpacity 
-      key={c.id} 
-      style={[styles.catPill, manualData.categoryId === c.id.toString() && styles.activeCatPill]}
-      onPress={() => setManualData({...manualData, categoryId: c.id.toString()})}
-    >
-      <Text style={[styles.catPillText, manualData.categoryId === c.id.toString() && styles.activeCatPillText]}>
-        {c.name}
-      </Text>
-    </TouchableOpacity>
-  ))}
-</ScrollView>
+          {/* 🎯 फिक्स: न्यू वैरिएंट सपोर्ट के लिए क्वांटिटी और यूनिट इनपुट भाई */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <View style={{ width: '48%' }}>
+              <Text style={styles.fieldLabel}>QUANTITY VALUE</Text>
+              <TextInput 
+                style={styles.fullInput} 
+                placeholder="e.g. 1, 250, 500" 
+                defaultValue="1"
+                onChangeText={(v) => setManualData({...manualData, quantityValue: v})} 
+              />
+            </View>
+            <View style={{ width: '48%' }}>
+              <Text style={styles.fieldLabel}>UNIT (e.g. kg, gm, piece)</Text>
+              <TextInput 
+                style={styles.fullInput} 
+                placeholder="e.g. piece" 
+                defaultValue="piece"
+                autoCapitalize="none"
+                onChangeText={(v) => setManualData({...manualData, unit: v})} 
+              />
+            </View>
+          </View>
+
+          <Text style={styles.fieldLabel}>CATEGORY</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScrollManual}>
+            {categories.map((c: any) => (
+              <TouchableOpacity 
+                key={c.id} 
+                style={[styles.catPill, manualData.categoryId === c.id.toString() && styles.activeCatPill]}
+                onPress={() => setManualData({...manualData, categoryId: c.id.toString()})}
+              >
+                <Text style={[styles.catPillText, manualData.categoryId === c.id.toString() && styles.activeCatPillText]}>
+                  {c.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </ScrollView>
       )}
 
@@ -368,7 +410,6 @@ const handleSubmit = async () => {
     </View>
   );
 }
-
 const styles = StyleSheet.create({
    img: { width: 80, height: 80, borderRadius: 10, backgroundColor: '#f1f5f9' },
   container: { flex: 1, backgroundColor: '#FFFFFF' },

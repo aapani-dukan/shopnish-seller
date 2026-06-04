@@ -18,45 +18,43 @@ export default function EditProductScreen({ route, navigation }: any) {
   // 1. Upar formData ke sath ek originalPrice state bhi rakhein
 
 
-// fetchData mein price set karein
+// 🎯 फिक्स 1: डेटाबेस से वैरिएंट्स का डेटा निकालकर स्टेट में बाइंड करना भाई
 const fetchData = useCallback(async () => {
   try {
     setLoading(true);
     const response = await api.get(`/api/products/${productId}`);
-
-    // ✅ Fix 1: Wrap Check
-    // Agar data seedha object hai (formatProductWithOffers ki wajah se), 
-    // toh use hi formData bana do.
     const productData = response.data.product ? response.data.product : response.data;
 
     if (productData && productData.id) {
-      setFormData(productData);
-      setInitialPrice(String(productData.price || '0'));
+      // पहले वैरिएंट को बेस वैरिएंट मानकर डेटा निकालो भाई
+      const baseVariant = productData.variants?.[0] || { price: 0, stock: 0, id: null };
+
+      setFormData({
+        ...productData,
+        // यूआई के लिए फ्लैट कीज बना दी भाई
+        price: baseVariant.price || '0',
+        stock: baseVariant.stock || 0,
+        variantId: baseVariant.id // इसे अपडेट के समय भेजना होगा भाई
+      });
+      setInitialPrice(String(baseVariant.price || '0'));
     } else {
-      // Agar yahan 200 OK aaya par data khali hai
       Alert.alert("Data Error", "Product ki jankari sahi format mein nahi mili.");
     }
   } catch (err: any) {
-    // ✅ Fix 2: 404 Handle
     if (err.response?.status === 404) {
       Alert.alert(
         "Product Not Found (404)", 
-        "Ya toh ID galat hai, ya product abhi Approved nahi hai (Backend logic)."
+        "Ya toh ID galat hai, ya product abhi Approved nahi hai भाई।"
       );
     }
   } finally {
     setLoading(false);
   }
 }, [productId]);
-
-useEffect(() => {
-  if (productId) {
-    fetchData();
-  }
-}, [fetchData, productId]);
 // 2. Updated Handle Update Logic
 
-  const handleUpdate = async () => {
+ // 🎯 फिक्स 2: नए वैरिएंट-अवेयर पैच एंडपॉइंट के हिसाब से पेलोड पैक करना भाई
+const handleUpdate = async () => {
   if (!formData?.name || !formData?.price) {
     Alert.alert("Rukiye!", "Naam aur Price zaroori hain.");
     return;
@@ -64,11 +62,9 @@ useEffect(() => {
 
   setSaving(true);
   try {
-    // 1. Destructure karke faltu fields ko bahar nikaal dein
-    // category, version aur timestamps ko database update mein nahi bhejte
     const { 
       category, 
-      version, 
+      variants, // पुराने वैरिएंट्स लिस्ट को हटा दो भाई
       createdAt, 
       updatedAt, 
       id, 
@@ -76,30 +72,28 @@ useEffect(() => {
       ...rawPayload 
     } = formData;
 
-    // 2. Final Payload taiyar karein
+    // 🗺️ यह है बैकएंड का असली वॉटरप्रूफ पेलोड रास्ता भाई:
     let updatePayload = {
       ...rawPayload,
-      price: String(formData.price), // Ensure string format
-      stock: Number(formData.stock), // Ensure number format
+      variantId: formData.variantId, // 👈 यह है तिजोरी की असली चाबी भाई!
+      price: Number(formData.price), // बैकएंड नंबर एक्सेप्ट करता है
+      stock: Number(formData.stock), 
     };
 
-    // 3. Versioning Logic (Price change check)
     if (String(formData.price) !== initialPrice) {
       updatePayload.changeReason = "Price updated via Seller App";
-      // Agar aapka backend 'version' field auto-increment karta hai toh use yahan mat bhejo
     }
 
-    console.log("🚀 Sending Clean Payload:", updatePayload);
+    console.log("🚀 Sending Variant-Aware Clean Payload:", updatePayload);
 
-    // 4. API Call
-    await api.patch(`/api/sellers/products/${productId}`, updatePayload);
+    // आपके सुधरे हुए कंट्रोलर एंडपॉइंट पर हिट मारो भाई
+    await api.patch(`/api/products/${productId}`, updatePayload);
     
-    Alert.alert("Success ✅", "Product update ho gaya!", [
+    Alert.alert("Success ✅", "Product update ho gaya hai भाई!", [
       { text: "Mast!", onPress: () => navigation.goBack() }
     ]);
   } catch (err: any) {
     console.error("Update Error Details:", err.response?.data || err.message);
-    
     const errorMsg = err.response?.data?.message || "Server error. Details check karein.";
     Alert.alert("Update Failed ❌", errorMsg);
   } finally {
@@ -139,6 +133,8 @@ if (loading || !formData) {
   </View>
 </View>
      
+       
+{/* 🎯 फिक्स 3: डुप्लीकेट हटाकर एकदम साफ़ सुथरा इनपुट फॉर्म भाई */}
         <View style={styles.form}>
           <Text style={styles.label}>Product Ka Naam</Text>
           <TextInput 
@@ -148,25 +144,38 @@ if (loading || !formData) {
           />
 
           <View style={styles.row}>
+            {/* प्राइस इनपुट ब्लॉक (वर्जनिंग बॉर्डर इंडिकेटर के साथ भाई) */}
             <View style={{ flex: 1, marginRight: 10 }}>
               <Text style={styles.label}>Price (₹)</Text>
               <TextInput 
-                style={styles.input}
+                style={[
+                  styles.input, 
+                  String(formData?.price) !== initialPrice && { borderColor: '#1e40af', borderWidth: 2 }
+                ]}
                 keyboardType="numeric"
-                value={String(formData?.price)}
+                value={String(formData?.price || '')}
                 onChangeText={(v) => setFormData({...formData, price: v})}
               />
             </View>
+            
+            {/* स्टॉक इनपुट ब्लॉक */}
             <View style={{ flex: 1 }}>
               <Text style={styles.label}>Stock</Text>
               <TextInput 
                 style={styles.input}
                 keyboardType="numeric"
-                value={String(formData?.stock)}
+                value={String(formData?.stock ?? '0')}
                 onChangeText={(v) => setFormData({...formData, stock: v})}
               />
             </View>
           </View>
+
+          {/* Price Change Warning Message */}
+          {String(formData?.price) !== initialPrice && (
+            <Text style={{ fontSize: 11, color: '#1e40af', marginTop: -10, marginBottom: 15, fontWeight: '700' }}>
+              ⚠️ Price change detect hua hai (Versioning ON भाई)
+            </Text>
+          )}
 
           <Text style={styles.label}>Description</Text>
           <TextInput 
@@ -175,38 +184,20 @@ if (loading || !formData) {
             value={formData?.description}
             onChangeText={(v) => setFormData({...formData, description: v})}
           />
-<View style={{ flex: 1, marginRight: 10 }}>
-  <Text style={styles.label}>Price (₹)</Text>
-  <TextInput 
-    style={[
-      styles.input, 
-      String(formData?.price) !== initialPrice && { borderColor: '#1e40af', borderWidth: 2 }
-    ]}
-    keyboardType="numeric"
-    value={String(formData.price)}
-    onChangeText={(v) => setFormData({...formData, price: v})}
-  />
-  {/* Price Change Indicator */}
-  {String(formData?.price) !== initialPrice && (
-    <Text style={{ fontSize: 10, color: '#1e40af', marginTop: -15, marginBottom: 10 }}>
-      Price change detect hua hai (Versioning ON)
-    </Text>
-  )}
-</View>
+
           {/* Status Toggle */}
           <View style={styles.statusBox}>
-            <View>
+            <View style={{ flex: 1, paddingRight: 10 }}>
               <Text style={styles.statusTitle}>Dukaan mein dikhayein?</Text>
               <Text style={styles.statusSub}>{formData?.isActive ? 'Abhi Customer ko dikh raha hai' : 'Abhi chupa hua hai'}</Text>
             </View>
             <TouchableOpacity 
               onPress={() => setFormData({...formData, isActive: !formData?.isActive})}
-              style={[styles.toggle, { backgroundColor: formData.isActive ? '#10b981' : '#cbd5e1' }]}
+              style={[styles.toggle, { backgroundColor: formData?.isActive ? '#10b981' : '#cbd5e1' }]}
             >
               <View style={[styles.toggleCircle, { alignSelf: formData?.isActive ? 'flex-end' : 'flex-start' }]} />
             </TouchableOpacity>
           </View>
-
         </View>
       </ScrollView>
 
