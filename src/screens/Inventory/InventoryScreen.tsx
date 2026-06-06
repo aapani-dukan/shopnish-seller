@@ -3,6 +3,7 @@ import {
   View, Text, FlatList, StyleSheet, Image, 
   TouchableOpacity, TextInput, ActivityIndicator, Alert, RefreshControl,Dimensions 
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native'; // 👈 इसे ऊपर इम्पोर्ट कर लें भाई
 import Feather from 'react-native-vector-icons/Feather';
 import api from '../../services/api';
 const BASE_URL = 'https://api.shopnish.com';
@@ -15,41 +16,53 @@ export default function InventoryScreen({ navigation }: any) {
 
  // 🎯 फिक्स: वैरिएंट्स एरे को सेफ़ली सिंक करने वाला डेटा फेचर भाई
   const fetchProducts = useCallback(async () => {
-    try {
-      const response = await api.get('/api/products/seller'); 
-      const data = response.data.products || response.data || [];
+  try {
+    // setLoading(true); // पहली बार लोडिंग दिखाने के लिए (अगर स्टेट बनाई हुई है)
+    
+    // 🎯 आपके बैकएंड का एकदम सटीक और प्रामाणिक एंडपॉइंट पाथ भाई
+    const response = await api.get('/api/products/seller'); 
+    
+    // बैकएंड रिस्पॉन्स स्ट्रक्चर को सेफ़ली हैंडल करें भाई
+    const rawData = response.data.products || response.data || [];
+    const data = Array.isArray(rawData) ? rawData : (rawData.data || []);
+    
+    // डेटाबेस से आने वाले हर प्रोडक्ट के वैरिएंट्स को सेफ़ली चेक कर लेते हैं भाई
+    const normalizedData = data.map((prod: any) => {
+      const variantsList = prod.variants || [];
       
-      // डेटाबेस से आने वाले हर प्रोडक्ट के वैरिएंट्स को सेफ़ली चेक कर लेते हैं भाई
-      const normalizedData = data.map((prod: any) => {
-        const variantsList = prod.variants || [];
-        
-        // सबसे पहला वैरिएंट हमारा बेस वैरिएंट होगा भाई
-        const baseVariant = variantsList[0] || { price: 0, stock: 0, id: null };
-        
-        // दुकान की टोटल यूनिट्स निकालने के लिए सारे वैरिएंट्स का स्टॉक जोड़ लो भाई
-        const totalStock = variantsList.reduce((sum: number, v: any) => sum + Number(v.stock || 0), 0);
+      // सबसे पहला वैरिएंट हमारा बेस वैरिएंट होगा भाई
+      const baseVariant = variantsList[0] || { price: 0, originalPrice: 0, stock: 0, id: null };
+      
+      // दुकान की टोटल यूनिट्स निकालने के लिए सारे वैरिएंट्स का स्टॉक जोड़ लो भाई
+      const totalStock = variantsList.reduce((sum: number, v: any) => sum + Number(v.stock || 0), 0);
 
-        return {
-          ...prod,
-          // फ्लैट कीज बना दी भाई ताकि नीचे यूआई रेंडरर को ज्यादा मेहनत न करनी पड़े
-          baseVariantId: baseVariant.id, 
-          displayPrice: baseVariant.price || prod.price || 0,
-          calculatedStock: totalStock,
-          baseVariantQty: `${baseVariant.quantityValue || '1'} ${baseVariant.unit || 'piece'}`
-        };
-      });
+      return {
+        ...prod,
+        // फ्लैट कीज बना दी भाई ताकि नीचे यूआई रेंडरर को ज्यादा मेहनत न करनी पड़े
+        baseVariantId: baseVariant.id, 
+        displayPrice: baseVariant.price || prod.price || 0,
+        displayOriginalPrice: baseVariant.originalPrice || prod.originalPrice || 0, // 💰 MRP को भी यहाँ सिंक में ले लिया भाई!
+        calculatedStock: totalStock,
+        baseVariantQty: `${baseVariant.quantityValue || '1'} ${baseVariant.unit || 'piece'}`
+      };
+    });
 
-      setProducts(normalizedData);
-    } catch (err: any) {
-      console.error("Inventory Fetch Error:", err.response?.status);
-      if(err.response?.status === 404) {
-         Alert.alert("Error", "Backend path nahi mila. Please /api check karein.");
-      }
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+    setProducts(normalizedData);
+  } catch (err: any) {
+    console.error("📋 Inventory Fetch Full Error Logs:", err?.response?.data || err.message);
+    const status = err.response?.status;
+    if (status === 404) {
+       Alert.alert("Error 404", "Backend path /api/products/seller nahi mila bhai.");
+    } else if (status === 401 || status === 403) {
+       Alert.alert("Auth Error", "Session khatam ho gaya hai, please fir se login karein.");
+    } else {
+       Alert.alert("Data Load Error", err.message || "Server se products nahi aa paye.");
     }
-  }, []);
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+}, []);
 // 🎯 फिक्स: प्रोडक्ट आईडी के साथ बेस वैरिएंट आईडी को भी सिंक किया भाई ताकि स्टॉक सही जगह अपडेट हो!
   const toggleStock = async (id: string, variantId: string | null, currentName: string, currentStock: number) => {
     const targetId = variantId || id; // अगर वैरिएंट आईडी न हो तो सेफ़्टी के लिए प्रोडक्ट आईडी भाई
@@ -89,7 +102,12 @@ export default function InventoryScreen({ navigation }: any) {
       currentStock.toString()
     );
   };
-  useEffect(() => { fetchProducts(); }, [fetchProducts]);
+  // 🚀 जब भी स्क्रीन वेंडर के सामने आएगी (चाहे पहली बार या Back आने पर), डेटा तुरंत री-लोड होगा भाई!
+useFocusEffect(
+  useCallback(() => {
+    fetchProducts();
+  }, [fetchProducts])
+);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -118,85 +136,156 @@ export default function InventoryScreen({ navigation }: any) {
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 // 🎯 फिक्स: नए फ्लैट कीज के आधार पर यूआई मैपिंग भाई!
+// 🎯 फिक्स: मल्टी-वैरिएंट अवेयर प्रीमियम यूआई रेंडरर भाई! (पुराना हटाकर इसे डालें)
 const renderProduct = ({ item }: any) => {
   const itemStock = Number(item.calculatedStock ?? 0);
   const isOutOfStock = itemStock <= 0;
   const isLowStock = itemStock > 0 && itemStock <= 5;
   const stockColor = isOutOfStock ? '#ef4444' : isLowStock ? '#f59e0b' : '#10b981';
 
-  return (
-    <View style={[styles.card, isOutOfStock && { backgroundColor: '#fdf2f2' }]}>
-      <View style={styles.imageContainer}>
-        {item.image ? (
-          <Image 
-            key={`prod-img-${item.id}`}
-            source={{ uri: item.image }} 
-            style={styles.prodImage} 
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={styles.fallbackView}>
-            <Text style={{fontSize: 10, color: '#94a3b8'}}>No Image</Text>
-          </View>
-        )}
+  const variantsList = item.variants || [];
 
-        {isOutOfStock && (
-          <View style={styles.outOfStockOverlay}>
-            <Text style={styles.outOfStockText}>SOLD OUT</Text>
-          </View>
-        )}
-      </View>
+  return (
+    <View style={[styles.card, isOutOfStock && { backgroundColor: '#fdf2f2' }, { flexDirection: 'column', padding: 12, height: 'auto' }]}>
       
-      <View style={styles.info}>
-        <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
-        {/* 🎯 बेस वैरिएंट की साइज/यूनिट स्क्रीन पर छोटी सी चमकेगी भाई (जैसे: 1 kg) */}
-        <Text style={{ fontSize: 11, color: '#64748b', fontWeight: '600' }}>({item.baseVariantQty})</Text>
-        <Text style={styles.price}>₹{Number(item.displayPrice).toLocaleString()}</Text>
-        <View style={styles.stockRow}>
-           <View style={[styles.modernBadge, { borderColor: stockColor + '40' }]}>
-              <View style={[styles.dot, { backgroundColor: stockColor }]} />
-              <Text style={styles.stockText}>{isOutOfStock ? 'Out of Stock' : `${itemStock} Units`}</Text>
-           </View>
+      {/* मुख्य प्रोडक्ट की जानकारी (ऊपर का हिस्सा) */}
+      <View style={{ flexDirection: 'row', width: '100%', marginBottom: 12 }}>
+        <View style={styles.imageContainer}>
+          {item.image ? (
+            <Image 
+              key={`prod-img-${item.id}`}
+              source={{ uri: item.image }} 
+              style={styles.prodImage} 
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={styles.fallbackView}>
+              <Text style={{fontSize: 10, color: '#94a3b8'}}>No Image</Text>
+            </View>
+          )}
+
+          {isOutOfStock && (
+            <View style={styles.outOfStockOverlay}>
+              <Text style={styles.outOfStockText}>SOLD OUT</Text>
+            </View>
+          )}
+        </View>
+        
+        <View style={[styles.info, { flex: 1, paddingRight: 8 }]}>
+          <Text style={[styles.name, { fontSize: 16, fontWeight: 'bold' }]} numberOfLines={1}>{item.name}</Text>
+          <Text style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+            कुल वैरिएंट्स: {variantsList.length}
+          </Text>
+          <View style={[styles.stockRow, { marginTop: 6 }]}>
+             <View style={[styles.modernBadge, { borderColor: stockColor + '40', paddingHorizontal: 8, paddingVertical: 2 }]}>
+                <View style={[styles.dot, { backgroundColor: stockColor }]} />
+                <Text style={[styles.stockText, { fontSize: 12 }]}>
+                  {isOutOfStock ? 'Out of Stock' : `टोटल स्टॉक: ${itemStock} Units`}
+                </Text>
+             </View>
+          </View>
+        </View>
+
+        {/* डिलीट बटन को मुख्य लेवल पर रख दिया भाई */}
+        <View style={{ justifyContent: 'center' }}>
+          <TouchableOpacity 
+            style={[styles.iconCircle, { backgroundColor: '#fef2f2' }]} 
+            onPress={() => deleteProduct(item.id)}
+          >
+            <Feather name="trash-2" size={16} color="#ef4444" />
+          </TouchableOpacity>
         </View>
       </View>
 
-      <View style={styles.actionsColumn}>
-        {/* Quick Stock Refill Button */}
-        <TouchableOpacity 
-          style={styles.iconCircle} 
-          onPress={() => toggleStock(item.id, item.baseVariantId, item.name, itemStock)}
-        >
-          <Feather name="refresh-cw" size={16} color="#1e40af" />
-        </TouchableOpacity>
+      <View style={{ height: 1, backgroundColor: '#f1f5f9', width: '100%', marginBottom: 10 }} />
 
-        <TouchableOpacity 
-          style={styles.iconCircle} 
-          onPress={() => navigation.navigate('EditProduct', { productId: item.id })}
-        >
-          <Feather name="edit-2" size={16} color="#1e40af" />
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.iconCircle, { backgroundColor: isLowStock ? '#fff7ed' : '#f0fdf4' }]} 
-          onPress={() => toggleStock(item.id, item.baseVariantId, item.name, itemStock)} 
-        >
-          <Feather 
-            name="plus-circle" 
-            size={18} 
-            color={isLowStock ? '#ea580c' : '#16a34a'} 
-          />
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.iconCircle, { backgroundColor: '#fef2f2' }]} 
-          onPress={() => deleteProduct(item.id)}
-        >
-          <Feather name="trash-2" size={16} color="#ef4444" />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-};
+      {/* 🎯 मास्टरस्ट्रोक: सारे वैरिएंट्स की कड़क लिस्ट जो अब स्क्रीन पर चमकेगी भाई! */}
+      <View style={{ width: '100%', gap: 8 }}>
+        {variantsList.map((v: any, idx: number) => {
+          const vStock = Number(v.stock || 0);
+          const isVLow = vStock <= 5;
+          
+          return (
+            <View key={v.id || idx} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
+              
+              {/* मात्रा और साइज (जैसे: 110g या 200g) */}
+              <View style={{ flex: 1.2 }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#334155' }}>
+                  📦 {v.quantityValue || '1'} {v.unit || 'piece'}
+                </Text>
+              </View>
+
+              {/* प्राइज और एमआरपी */}
+              <View style={{ flex: 1.5 }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#0f172a' }}>₹{v.price}</Text>
+                {v.originalPrice && Number(v.originalPrice) > Number(v.price) && (
+                  <Text style={{ fontSize: 11, color: '#94a3b8', textDecorationLine: 'line-through' }}>₹{v.originalPrice}</Text>
+                )}
+              </View>
+
+              {/* स्टॉक की गिनती */}
+              <View style={{ flex: 1.2 }}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: vStock === 0 ? '#ef4444' : isVLow ? '#ea580c' : '#16a34a' }}>
+                  {vStock === 0 ? 'खत्म' : `${vStock} पीस`}
+                </Text>
+              </View>
+
+              {/* एक्शन बटन्स (सिर्फ इस विशिष्ट वैरिएंट के लिए भाई!) */}
+<View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+  {/* स्टॉक क्विक अपडेट बटन */}
+  <TouchableOpacity 
+    style={[styles.iconCircle, { width: 32, height: 32, backgroundColor: '#f0fdf4' }]} 
+    onPress={() => toggleStock(item.id, v.id, `${item.name} (${v.quantityValue} ${v.unit})`, vStock)}
+  >
+    <Feather name="plus-circle" size={16} color="#16a34a" />
+  </TouchableOpacity>
+
+  {/* 🎯 एडिट बटन: productId और variantId के साथ अब isNewVariant: false भी भेज रहे हैं भाई */}
+  <TouchableOpacity 
+    style={[styles.iconCircle, { width: 32, height: 32, backgroundColor: '#eff6ff' }]} 
+    onPress={() => navigation.navigate('EditProduct', { 
+      productId: item.id, 
+      variantId: v.id,
+      isNewVariant: false // ✏️ पुराना एडिट मोड भाई
+    })}
+  >
+    <Feather name="edit-2" size={14} color="#1e40af" />
+  </TouchableOpacity>
+</View>
+
+</View>
+);
+})}
+
+{/* ➕ 🌟 नया सेक्शन: इस प्रोडक्ट के सभी वैरिएंट्स खत्म होने के तुरंत बाद एक साफ़ सुथरा प्लस बटन */}
+<TouchableOpacity 
+style={{
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  backgroundColor: '#f8fafc',
+  borderWidth: 1,
+  borderColor: '#e2e8f0',
+  borderStyle: 'dashed',
+  borderRadius: 8,
+  paddingVertical: 8,
+  marginTop: 10,
+  width: '100%'
+}} 
+onPress={() => navigation.navigate('EditProduct', { 
+  productId: item.id, 
+  isNewVariant: true // 🔥 नया वैरिएंट जोड़ने का कड़क फ्लैग भाई!
+})}
+>
+<Feather name="plus" size={14} color="#64748b" style={{ marginRight: 6 }} />
+<Text style={{ fontSize: 13, color: '#64748b', fontWeight: '600' }}>
+  {item.name} mein naya Variant jodein (+ Add)
+</Text>
+</TouchableOpacity>
+</View>
+</View>
+);
+}
 if (loading && !refreshing) {
     return <View style={styles.center}><ActivityIndicator size="large" color="#1e40af" /></View>;
   }

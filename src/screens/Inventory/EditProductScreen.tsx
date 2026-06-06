@@ -7,94 +7,171 @@ import Feather from 'react-native-vector-icons/Feather';
 import api from '../../services/api';
 
 export default function EditProductScreen({ route, navigation }: any) {
-  const { productId } = route.params;
+  // 🎯 इन्वेंट्री स्क्रीन से भेजे गए दोनों पैरामीटर्स को सेफ़ली निकालें भाई
+  const { productId, variantId } = route.params || {};
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [categories, setCategories] = useState([]);
   const [formData, setFormData] = useState<any>(null);
-  const [initialPrice, setInitialPrice] = useState<string>('');
-  // 1. Fetch Data (Product + Categories)
-  // 1. Upar formData ke sath ek originalPrice state bhi rakhein
+const [initialPrice, setInitialPrice] = useState('');
+const [existingVariants, setExistingVariants] = useState<any[]>([]);
+  const fetchData = useCallback(async () => {
+    if (!productId) {
+      Alert.alert("Error", "Product ID missing hai bhai!");
+      setLoading(false);
+      return;
+    }
 
+    try {
+      setLoading(true);
+      
+      // 1. बैकएंड से प्रोडक्ट का फ्रेश डेटा लाओ भाई
+      const response = await api.get(`/api/products/${productId}`);
+      const productData = response.data.product ? response.data.product : response.data;
+if (productData?.variants) {
+  setExistingVariants(productData.variants); // 👈 बैकअप यहाँ सुरक्षित हो गया भाई!
+}
+      if (!productData) {
+        throw new Error("Product data not found on server");
+      }
 
-// 🎯 फिक्स 1: डेटाबेस से वैरिएंट्स का डेटा निकालकर स्टेट में बाइंड करना भाई
-const fetchData = useCallback(async () => {
-  try {
-    setLoading(true);
-    const response = await api.get(`/api/products/${productId}`);
-    const productData = response.data.product ? response.data.product : response.data;
+      // 2. नए वैरिएंट आर्किटेक्चर के हिसाब से सही वैरिएंट को फिल्टर करो भाई
+      let selectedVariant = null;
+      if (productData.variants && Array.isArray(productData.variants)) {
+        if (variantId) {
+          selectedVariant = productData.variants.find((v: any) => String(v.id) === String(variantId));
+        }
+        // फॉलबैक: अगर विशिष्ट वैरिएंट आईडी न मिले या मैच न हो, तो पहला वैरिएंट उठा लो भाई
+        if (!selectedVariant && productData.variants.length > 0) {
+          selectedVariant = productData.variants[0];
+        }
+      }
 
-    if (productData && productData.id) {
-      // पहले वैरिएंट को बेस वैरिएंट मानकर डेटा निकालो भाई
-      const baseVariant = productData.variants?.[0] || { price: 0, stock: 0, id: null };
-
+      // 3. फॉर्म डेटा स्टेट को नए अलाइनमेंट के साथ लॉक करें ताकि यूआई ब्लैंक न हो भाई
       setFormData({
         ...productData,
-        // यूआई के लिए फ्लैट कीज बना दी भाई
-        price: baseVariant.price || '0',
-        stock: baseVariant.stock || 0,
-        variantId: baseVariant.id // इसे अपडेट के समय भेजना होगा भाई
+        variantId: selectedVariant ? selectedVariant.id : null,
+        price: selectedVariant ? String(selectedVariant.price) : '',
+        originalPrice: selectedVariant ? String(selectedVariant.originalPrice || '') : '',
+        stock: selectedVariant ? String(selectedVariant.stock ?? 0) : '0',
+        quantityValue: selectedVariant ? String(selectedVariant.quantityValue || '') : '',
+        unit: selectedVariant ? selectedVariant.unit : '',
       });
-      setInitialPrice(String(baseVariant.price || '0'));
-    } else {
-      Alert.alert("Data Error", "Product ki jankari sahi format mein nahi mili.");
-    }
-  } catch (err: any) {
-    if (err.response?.status === 404) {
-      Alert.alert(
-        "Product Not Found (404)", 
-        "Ya toh ID galat hai, ya product abhi Approved nahi hai भाई।"
-      );
-    }
-  } finally {
-    setLoading(false);
-  }
-}, [productId]);
-// 2. Updated Handle Update Logic
 
+    } catch (err: any) {
+      console.error("📋 Fetch Data Error Logs:", err?.response?.data || err?.message);
+      
+      const status = err.response?.status;
+      if (status === 404) {
+        Alert.alert("Product Not Found (404)", "Ya toh ID galat hai, ya product abhi Approved nahi hai bhai.");
+      } else {
+        Alert.alert("Data Load Failed ❌", err.message || "Server se sampark nahi ho paya.");
+      }
+    } finally {
+      // 😎 चाहे सक्सेस हो या एरर—स्पिनर को हर हाल में यहाँ शांत होना ही पड़ेगा भाई!
+      setLoading(false);
+    }
+  }, [productId, variantId]);
+
+  // ⏳ स्क्रीन खुलते ही डेटा लोड ट्रिगर करें भाई
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
  // 🎯 फिक्स 2: नए वैरिएंट-अवेयर पैच एंडपॉइंट के हिसाब से पेलोड पैक करना भाई
 const handleUpdate = async () => {
-  if (!formData?.name || !formData?.price) {
-    Alert.alert("Rukiye!", "Naam aur Price zaroori hain.");
+  // ⛔ वैलिडेशन चेक: प्राइस और स्टॉक खाली नहीं होना चाहिए भाई
+  if (!formData?.price || !formData?.stock) {
+    Alert.alert("Rukiye!", "Price aur Stock bharna zaroori hai bhai.");
+    return;
+  }
+
+  // अगर नया वैरिएंट है, तो मात्रा और यूनिट भी डालना जरूरी है भाई
+  if (route.params?.isNewVariant && (!formData?.quantityValue || !formData?.unit)) {
+    Alert.alert("Rukiye!", "Naye variant ke liye Maatra (Quantity) aur Unit bharna zaroori hai.");
     return;
   }
 
   setSaving(true);
   try {
-    const { 
-      category, 
-      variants, // पुराने वैरिएंट्स लिस्ट को हटा दो भाई
-      createdAt, 
-      updatedAt, 
-      id, 
-      _id,
-      ...rawPayload 
-    } = formData;
-
-    // 🗺️ यह है बैकएंड का असली वॉटरप्रूफ पेलोड रास्ता भाई:
-    let updatePayload = {
-      ...rawPayload,
-      variantId: formData.variantId, // 👈 यह है तिजोरी की असली चाबी भाई!
-      price: Number(formData.price), // बैकएंड नंबर एक्सेप्ट करता है
-      stock: Number(formData.stock), 
+    // 1️⃣ [यहाँ सेट हुआ] नया वेरिएंट ढांचा जो वेंडर ने अभी फॉर्म में भरा है भाई
+    const newVariantObj = {
+      quantityValue: String(formData.quantityValue || '1'),
+      unit: formData.unit || 'g',
+      originalPrice: String(formData.originalPrice || formData.price), // 💰 MRP लॉक
+      discountType: 'percentage',
+      discountValue: formData.originalPrice && formData.price 
+        ? String(Math.round(((Number(formData.originalPrice) - Number(formData.price)) / Number(formData.originalPrice)) * 100))
+        : '0',
+      price: Number(formData.price), // फाइनल सेलिंग प्राइस
+      stock: Number(formData.stock),
+      minOrderQty: 1,
+      maxOrderQty: 100
     };
 
-    if (String(formData.price) !== initialPrice) {
-      updatePayload.changeReason = "Price updated via Seller App";
+    let finalVariantsArray = [];
+
+    // 2️⃣ [यहाँ सेट हुआ] कंडीशन चेक—नया वैरिएंट जोड़ना है या पुराना एडिट करना है
+    if (formData.isNewVariantFlag || route.params?.isNewVariant) {
+      // ➕ नया वेरिएंट जोड़ रहे हैं: पुराने जितने भी वेरिएंट थे, उन्हें रखो और नया वाला भी उसमें जोड़ दो भाई!
+      const mappedExisting = (existingVariants || []).map((v: any) => ({
+        quantityValue: String(v.quantityValue),
+        unit: v.unit,
+        originalPrice: String(v.originalPrice),
+        discountType: v.discountType || 'percentage',
+        discountValue: String(v.discountValue || 0),
+        price: Number(v.price),
+        stock: Number(v.stock),
+      }));
+      
+      finalVariantsArray = [...mappedExisting, newVariantObj];
+    } else {
+      // ✏️ पुराना ही एडिट कर रहे हैं: सिर्फ इसी विशिष्ट वेरिएंट को अपडेट करो (बाकी को वैसा ही रहने दो)
+      finalVariantsArray = (existingVariants || []).map((v: any) => {
+        if (String(v.id) === String(formData.variantId)) {
+          return newVariantObj; // अपडेटेड डेटा भाई
+        }
+        return {
+          quantityValue: String(v.quantityValue),
+          unit: v.unit,
+          originalPrice: String(v.originalPrice),
+          discountType: v.discountType || 'percentage',
+          discountValue: String(v.discountValue || 0),
+          price: Number(v.price),
+          stock: Number(v.stock),
+        };
+      });
     }
 
-    console.log("🚀 Sending Variant-Aware Clean Payload:", updatePayload);
+    // 3️⃣ बैकएंड की मांग के अनुसार क्लीन पेलोड तैयार करो भाई
+    const updatePayload = {
+      name: formData.name?.trim(),
+      description: formData.description || '',
+      categoryId: parseInt(String(formData.categoryId)),
+      brand: formData.brand || null,
+      estimatedDeliveryTime: formData.estimatedDeliveryTime || "1-2 hours",
+      imageUrl: formData.image,
+      variants: finalVariantsArray // 🔥 पुराने + नए सभी वैरिएंट्स का पूरा एरे यहाँ चला गया भाई!
+    };
 
-    // आपके सुधरे हुए कंट्रोलर एंडपॉइंट पर हिट मारो भाई
-    await api.patch(`/api/products/${productId}`, updatePayload);
+    // वर्जनिंग चेंज रीजन ट्रेकिंग भाई
+    if (String(formData.price) !== initialPrice && !route.params?.isNewVariant) {
+      (updatePayload as any).changeReason = "Price updated via Seller App";
+    }
+
+    console.log("🚀 Sending Correct Variant-Aware Payload to Backend:", JSON.stringify(updatePayload));
+
+    // 🎯 असली यूआरएल जहाँ बैकएंड 'PATCH' एक्सेप्ट करता है: /api/sellers/products/:id
+    const response = await api.patch(`/api/sellers/products/${productId}`, updatePayload);
     
-    Alert.alert("Success ✅", "Product update ho gaya hai भाई!", [
-      { text: "Mast!", onPress: () => navigation.goBack() }
-    ]);
+    if (response.data.success || response.data.message) {
+      Alert.alert("Success ✅", "Product aur Variants update ho gaye bhai!", [
+        { text: "Mast!", onPress: () => navigation.goBack() }
+      ]);
+    }
   } catch (err: any) {
     console.error("Update Error Details:", err.response?.data || err.message);
-    const errorMsg = err.response?.data?.message || "Server error. Details check karein.";
+    const errorMsg = err.response?.data?.error || "Server ne data nahi liya. Paths check karein.";
     Alert.alert("Update Failed ❌", errorMsg);
   } finally {
     setSaving(false);
@@ -109,117 +186,152 @@ if (loading || !formData) {
     </View>
   );
 }
-
-  return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
-      style={{ flex: 1 }}
-    >
-      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
-        {/* Product Image Preview - Safety added with formData && */}
-<View style={styles.imageContainer}>
-  {formData && (
-    <Image 
-      source={{ 
-        uri: formData?.image 
-          ? encodeURI(formData?.image.trim()) 
-          : 'https://via.placeholder.com/150.png' 
-      }} 
-      style={styles.productImg} 
-    />
-  )}
-  <View style={styles.imageOverlay}>
-    <Text style={styles.imageHint}>Web dashboard se photo badlein</Text>
-  </View>
-</View>
-     
-       
-{/* 🎯 फिक्स 3: डुप्लीकेट हटाकर एकदम साफ़ सुथरा इनपुट फॉर्म भाई */}
-        <View style={styles.form}>
-          <Text style={styles.label}>Product Ka Naam</Text>
-          <TextInput 
-            style={styles.input}
-            value={formData?.name}
-            onChangeText={(v) => setFormData({...formData, name: v})}
+return (
+  <KeyboardAvoidingView 
+    behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
+    style={{ flex: 1 }}
+  >
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
+      {/* Product Image Preview - Safety added with formData && */}
+      <View style={styles.imageContainer}>
+        {formData && (
+          <Image 
+            source={{ 
+              uri: formData?.image 
+                ? encodeURI(formData?.image.trim()) 
+                : 'https://via.placeholder.com/150.png' 
+            }} 
+            style={styles.productImg} 
           />
+        )}
+        <View style={styles.imageOverlay}>
+          <Text style={styles.imageHint}>Web dashboard se photo badlein</Text>
+        </View>
+      </View>
+   
+      {/* 🎯 साफ़ सुथरा इनपुट फॉर्म भाई */}
+      <View style={styles.form}>
+        <Text style={styles.label}>Product Ka Naam</Text>
+        <TextInput 
+          style={[styles.input, route.params?.isNewVariant && { backgroundColor: '#f3f4f6' }]}
+          value={formData?.name}
+          editable={!route.params?.isNewVariant} // अगर नया वैरिएंट है, तो नाम लॉक रखें ताकि पैरेंट नाम न बदले भाई
+          onChangeText={(v) => setFormData({...formData, name: v})}
+        />
 
-          <View style={styles.row}>
-            {/* प्राइस इनपुट ब्लॉक (वर्जनिंग बॉर्डर इंडिकेटर के साथ भाई) */}
-            <View style={{ flex: 1, marginRight: 10 }}>
-              <Text style={styles.label}>Price (₹)</Text>
-              <TextInput 
-                style={[
-                  styles.input, 
-                  String(formData?.price) !== initialPrice && { borderColor: '#1e40af', borderWidth: 2 }
-                ]}
-                keyboardType="numeric"
-                value={String(formData?.price || '')}
-                onChangeText={(v) => setFormData({...formData, price: v})}
-              />
-            </View>
-            
-            {/* स्टॉक इनपुट ब्लॉक */}
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Stock</Text>
-              <TextInput 
-                style={styles.input}
-                keyboardType="numeric"
-                value={String(formData?.stock ?? '0')}
-                onChangeText={(v) => setFormData({...formData, stock: v})}
-              />
-            </View>
+        {/* 🌟 नया सेक्शन: MRP (Original Price) का डिब्बा जो गायब था भाई */}
+        <Text style={styles.label}>MRP / Original Price (₹)</Text>
+        <TextInput 
+          style={styles.input}
+          keyboardType="numeric"
+          placeholder="उदा. 50"
+          value={String(formData?.originalPrice || '')}
+          onChangeText={(v) => setFormData({...formData, originalPrice: v})}
+        />
+
+        <View style={styles.row}>
+          {/* प्राइस इनपुट ब्लॉक (वर्जनिंग बॉर्डर इंडिकेटर के साथ भाई) */}
+          <View style={{ flex: 1, marginRight: 10 }}>
+            <Text style={styles.label}>Selling Price (₹)</Text>
+            <TextInput 
+              style={[
+                styles.input, 
+                String(formData?.price) !== initialPrice && { borderColor: '#1e40af', borderWidth: 2 }
+              ]}
+              keyboardType="numeric"
+              placeholder="उदा. 45"
+              value={String(formData?.price || '')}
+              onChangeText={(v) => setFormData({...formData, price: v})}
+            />
           </View>
-
-          {/* Price Change Warning Message */}
-          {String(formData?.price) !== initialPrice && (
-            <Text style={{ fontSize: 11, color: '#1e40af', marginTop: -10, marginBottom: 15, fontWeight: '700' }}>
-              ⚠️ Price change detect hua hai (Versioning ON भाई)
-            </Text>
-          )}
-
-          <Text style={styles.label}>Description</Text>
-          <TextInput 
-            style={[styles.input, { height: 100, textAlignVertical: 'top' }]}
-            multiline
-            value={formData?.description}
-            onChangeText={(v) => setFormData({...formData, description: v})}
-          />
-
-          {/* Status Toggle */}
-          <View style={styles.statusBox}>
-            <View style={{ flex: 1, paddingRight: 10 }}>
-              <Text style={styles.statusTitle}>Dukaan mein dikhayein?</Text>
-              <Text style={styles.statusSub}>{formData?.isActive ? 'Abhi Customer ko dikh raha hai' : 'Abhi chupa hua hai'}</Text>
-            </View>
-            <TouchableOpacity 
-              onPress={() => setFormData({...formData, isActive: !formData?.isActive})}
-              style={[styles.toggle, { backgroundColor: formData?.isActive ? '#10b981' : '#cbd5e1' }]}
-            >
-              <View style={[styles.toggleCircle, { alignSelf: formData?.isActive ? 'flex-end' : 'flex-start' }]} />
-            </TouchableOpacity>
+          
+          {/* स्टॉक इनपुट ब्लॉक */}
+          <View style={{ flex: 1 }}>
+            <Text style={styles.label}>Stock</Text>
+            <TextInput 
+              style={styles.input}
+              keyboardType="numeric"
+              placeholder="उदा. 10"
+              value={String(formData?.stock ?? '0')}
+              onChangeText={(v) => setFormData({...formData, stock: v})}
+            />
           </View>
         </View>
-      </ScrollView>
 
-      {/* Action Footer */}
-      <View style={styles.footer}>
-        <TouchableOpacity 
-          style={styles.saveBtn} 
-          onPress={handleUpdate}
-          disabled={saving}
-        >
-          {saving ? <ActivityIndicator color="#fff" /> : (
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Feather name="save" size={20} color="#fff" style={{ marginRight: 10 }} />
-              <Text style={styles.saveBtnText}>Save Changes</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+        {/* Price Change Warning Message */}
+        {String(formData?.price) !== initialPrice && (
+          <Text style={{ fontSize: 11, color: '#1e40af', marginTop: -10, marginBottom: 15, fontWeight: '700' }}>
+            ⚠️ Price change detect hua hai (Versioning ON भाई)
+          </Text>
+        )}
+
+        {/* 🌟 नया सेक्शन: वजन/मात्रा (Quantity) और यूनिट (Unit) के डिब्बे - वैरिएंट के लिए सबसे जरूरी भाई */}
+        <View style={styles.row}>
+          <View style={{ flex: 1, marginRight: 10 }}>
+            <Text style={styles.label}>मात्रा / Quantity Value</Text>
+            <TextInput 
+              style={styles.input}
+              placeholder="उदा. 500 या 1"
+              value={String(formData?.quantityValue || '')}
+              onChangeText={(v) => setFormData({...formData, quantityValue: v})}
+            />
+          </View>
+          
+          <View style={{ flex: 1 }}>
+            <Text style={styles.label}>यूनिट / Unit</Text>
+            <TextInput 
+              style={styles.input}
+              placeholder="उदा. g, kg, piece"
+              autoCapitalize="none"
+              value={String(formData?.unit || '')}
+              onChangeText={(v) => setFormData({...formData, unit: v})}
+            />
+          </View>
+        </View>
+
+        <Text style={styles.label}>Description</Text>
+        <TextInput 
+          style={[styles.input, { height: 100, textAlignVertical: 'top' }]}
+          multiline
+          value={formData?.description}
+          onChangeText={(v) => setFormData({...formData, description: v})}
+        />
+
+        {/* Status Toggle */}
+        <View style={styles.statusBox}>
+          <View style={{ flex: 1, paddingRight: 10 }}>
+            <Text style={styles.statusTitle}>Dukaan mein dikhayein?</Text>
+            <Text style={styles.statusSub}>{formData?.isActive ? 'Abhi Customer ko dikh raha hai' : 'Abhi chupa hua hai'}</Text>
+          </View>
+          <TouchableOpacity 
+            onPress={() => setFormData({...formData, isActive: !formData?.isActive})}
+            style={[styles.toggle, { backgroundColor: formData?.isActive ? '#10b981' : '#cbd5e1' }]}
+          >
+            <View style={[styles.toggleCircle, { alignSelf: formData?.isActive ? 'flex-end' : 'flex-start' }]} />
+          </TouchableOpacity>
+        </View>
       </View>
-    </KeyboardAvoidingView>
-  );
-}
+    </ScrollView>
 
+    {/* Action Footer */}
+    <View style={styles.footer}>
+      <TouchableOpacity 
+        style={styles.saveBtn} 
+        onPress={handleUpdate}
+        disabled={saving}
+      >
+        {saving ? <ActivityIndicator color="#fff" /> : (
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {/* यहाँ Feather आइकॉन काम कर रहा है, तो ठीक वरना सिंपल टेक्स्ट दिखेगा भाई */}
+            <Text style={styles.saveBtnText}>💾 Save Changes</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    </View>
+  </KeyboardAvoidingView>
+);
+}
+ 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
