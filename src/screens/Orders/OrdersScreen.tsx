@@ -29,7 +29,7 @@ export default function OrdersScreen({ navigation }: any) {
   const fetchOrders = useCallback(async () => {
     try {
       // आपके सुधरे हुए वेंडर-स्पेसिफिक सब-ऑर्डर एंडपॉइंट पर हिट मारो भाई
-      const response = await api.get('/api/sellers/sub-orders'); 
+      const response = await api.get('/api/sellers/orders'); 
       
       const rawData = Array.isArray(response.data) 
         ? response.data 
