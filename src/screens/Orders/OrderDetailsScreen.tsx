@@ -162,35 +162,45 @@ console.log("====== 📦 SELLER ORDER DATA END ======");
             );
           })()}
         </View>
-{/* Items in this Order Section - 🎯 फिक्स: वैरिएंट साइज डिस्प्ले के साथ भाई! */}
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Items in this Order</Text>
-          {order?.items && order.items.length > 0 ? (
-            order.items.map((item: any, index: number) => {
-              // वैरिएंट का नाम या साइज निकालने का कड़क लॉजिक भाई
-              const variantInfo = item.variantName || item.variantTitle || item.unit || '';
-              
-              return (
-                <View key={index} style={styles.itemRow}>
-                  <View style={styles.qtyBadge}>
-                    <Text style={styles.qtyText}>{item.quantity}x</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.productName}>{item.productName}</Text>
-                    {variantInfo ? (
-                      <Text style={[styles.unitText, { color: '#1e40af', fontWeight: '700' }]}>
-                        वैरिएंट: {String(variantInfo)}
-                      </Text>
-                    ) : null}
-                  </View>
-                  <Text style={styles.priceText}>₹{item.itemTotal}</Text>
-                </View>
-              );
-            })
-          ) : (
-            <Text style={{ textAlign: 'center', margin: 10 }}>No items found in this order.</Text>
-          )}
-  
+{/* Items in this Order Section - 🎯 डेटाबेस variant_name कॉलम आधारित फिक्स! */}
+<View style={styles.card}>
+  <Text style={styles.sectionTitle}>Items in this Order</Text>
+  {order?.items && order.items.length > 0 ? (
+    order.items.map((item: any, index: number) => {
+      
+      // 🌟 कड़क फिक्स: डेटाबेस के 'variant_name' कॉलम से सीधे "100 g" उठाओ भाई
+      // बैकएंड इसे variantName, variant_name या variantTitle किसी भी नाम से भेज सकता है
+      const variantDisplay = (item.variantName || item.variant_name || item.variantTitle || '').trim();
+      
+      // फॉलबैक: अगर किसी पुराने आर्डर में variant_name खाली हो, तभी यूनिट पर जाओ भाई
+      const unitFallback = (item.unit || item.product_unit || item.variantUnit || '').trim();
+      
+      // फाइनल टेक्स्ट जो स्क्रीन पर छपेगा
+      const finalVariantText = variantDisplay || unitFallback || '';
+      
+      return (
+        <View key={index} style={styles.itemRow}>
+          <View style={styles.qtyBadge}>
+            <Text style={styles.qtyText}>{item.quantity}x</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.productName}>{item.productName}</Text>
+            
+            {/* 📝 अगर डेटाबेस से "100 g" मिल गया, तो सुंदर अक्षरों में छाप दो */}
+            {finalVariantText ? (
+              <Text style={[styles.unitText, { color: '#1e40af', fontWeight: '700', marginTop: 3 }]}>
+                वैरिएंट: {String(finalVariantText)}
+              </Text>
+            ) : null}
+          </View>
+          <Text style={styles.priceText}>₹{item.itemTotal}</Text>
+        </View>
+      );
+    })
+  ) : (
+    <Text style={{ textAlign: 'center', margin: 10 }}>No items found in this order.</Text>
+  )}
+
   {/* 🎯 आपके कहे अनुसार: केवल आइटम की राशियों (itemTotal) को आपस में जोड़ने वाला सटीक फंक्शन */}
 {(() => {
   // 1. लॉग्स के अनुसार सीधे 'order.items' से लिस्ट निकाली

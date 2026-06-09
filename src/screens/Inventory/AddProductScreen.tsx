@@ -81,35 +81,23 @@ const [manualData, setManualData] = useState<any>({
     setSelectedItems(newItems);
   };
 
-  // 4. Cloudinary Image Upload (जैसा वेब में था)
- const handleImagePick = async () => {
-  const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.6 });
-  if (result.assets && result.assets[0]) {
-    setImageUploading(true);
-    const file = result.assets[0];
-    
-    const formData = new FormData();
-    formData.append('file', {
-     uri: Platform.OS === 'android' ? file.uri! : file.uri!.replace('file://', ''),
-      type: file.type || 'image/jpeg',
-      name: file.fileName || 'product.jpg',
-    } as any);
-    formData.append('upload_preset', 'shopnish_products');
-
-    try {
-      // Axios is more stable for large file uploads on mobile
-      const res = await api.post('https://api.cloudinary.com/v1_1/dcah0b2jy/image/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      setManualData({ ...manualData, image: res.data.secure_url });
-    } catch (err) {
-      Alert.alert("Upload Failed", "Network check karein aur dobara koshish karein.");
-    } finally {
-      setImageUploading(false);
+  // =====================================================================
+  // 🎯 1. IMAGE PICK HANDLER: केवल लोकल URI लॉक करेगा, नो क्लाउडिनरी ड्रामा भाई साहब!
+  // =====================================================================
+  const handleImagePick = async () => {
+    const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.8 });
+    if (result.assets && result.assets[0]) {
+      const selectedUri = result.assets[0].uri!;
+      console.log("✅ Mobile Gallery Selected Path Locked:", selectedUri);
+      
+      // सीधे लोकल पाथ को स्टेट में स्टोर करें भाई साहब
+      setManualData({ ...manualData, image: selectedUri });
     }
-  }
-};
- // 🎯 5. Submit Handler (100% वैरिएंट-सिंक और नंबर-सुरक्षित इंडस्ट्रियल ग्रेड भाई)
+  };
+
+  // =====================================================================
+  // 🎯 2. SUBMIT HANDLER: मैनुअल डेटा को साफ़ मल्टिपार्ट चैनल से भेजेगा भाई साहब
+  // =====================================================================
   const handleSubmit = async () => {
     setLoading(true);
     try {
@@ -118,7 +106,7 @@ const [manualData, setManualData] = useState<any>({
         if (selectedArray.length === 0) {
           throw new Error("Kripya kam se kam ek product select karein.");
         }
-const payload = selectedArray.map((item: any) => {
+        const payload = selectedArray.map((item: any) => {
           if (!item.variants || item.variants.length === 0) {
             throw new Error(`${item.name} ka size/variant bharna zaroori hai.`);
           }
@@ -144,7 +132,6 @@ const payload = selectedArray.map((item: any) => {
             };
           });
 
-          // 🎯 पहले वैरिएंट की कीमत और स्टॉक को बेस मान लेते हैं भाई ताकि बैकएंड क्रैश न हो
           const basePrice = cleanedVariants[0]?.price || 0;
           const baseStock = cleanedVariants[0]?.stock || 0;
 
@@ -153,75 +140,112 @@ const payload = selectedArray.map((item: any) => {
             name: String(item.name || "Unnamed Product"),
             image: String(item.image || ""), 
             categoryId: item.categoryId ? Number(item.categoryId) : 0,
-            
-            // 🔥 जुड़ाव: ये दोनों फ़ील्ड्स बैकएंड के .toString() लॉजिक को क्रैश होने से बचाएंगे भाई!
             price: basePrice, 
             stock: baseStock,
-            
             isActive: true,
             approvalStatus: 'approved', 
             variants: cleanedVariants 
           };
         });
-             console.log("🚀 Catalog Bulk Payload:", JSON.stringify(payload, null, 2));
+        console.log("🚀 Catalog Bulk Payload:", JSON.stringify(payload, null, 2));
         await api.post('/api/products/bulk', { products: payload });
 
-      } else {
-        // --- MANUAL MODE (100% मल्टी-वैरिएंट्स अपग्रेड भाई) ---
+  } else {
+        // =====================================================================
+        // 🛍️ MANUAL MODE: 100% मुकम्मल मेन-फील्ड्स और वैलिडेशन सिंक पैच भाई साहब!
+        // =====================================================================
         if (!manualData.name || manualData.name.length < 3) throw new Error("Naam chota hai.");
-        if (!manualData.image || manualData.image.includes('no-image-icon')) {
-          throw new Error("Kripya asli photo upload karein, camera icon nahi.");
-        }
+        if (!manualData.image) throw new Error("Kripya photo select karein.");
         if (!manualData.categoryId) throw new Error("Category chunna zaroori hai.");
         if (!manualData.variants || manualData.variants.length === 0) {
           throw new Error("Kam se kam ek variant add karna zaroori hai.");
         }
 
-        // 🎯 फिक्स 2: मैनुअल के सारे वैरिएंट्स को साफ़ करके नंबर फॉर्मेट में बदला भाई
+        // 1. सारे मैनुअल वैरिएंट्स को साफ़ करके नंबर फॉर्मेट में बदलें भाई
         const cleanedManualVariants = manualData.variants.map((v: any, idx: number) => {
           const priceNum = Number(v.price);
           const originalPriceNum = Number(v.originalPrice || v.price);
           const stockNum = Number(v.stock);
 
           if (isNaN(priceNum) || priceNum <= 0) {
-            throw new Error(`मैनुअल प्रोडक्ट के वैरिएंट #${idx + 1} का Rate सही लिखें भाई।`);
+            throw new Error(`वैरिएंट #${idx + 1} का Rate सही लिखें भाई।`);
           }
           if (priceNum > originalPriceNum) {
-            throw new Error(`मैनुअल प्रोडक्ट के वैरिएंट #${idx + 1} का Rate उसके MRP से ज़्यादा नहीं हो सकता भाई।`);
+            throw new Error(`वैरिएंट #${idx + 1} का Rate उसके MRP से ज़्यादा नहीं हो सकता भाई।`);
           }
 
           return {
-            quantityValue: String(v.quantityValue || "1"),
-            unit: String(v.unit || "piece"), // 🎯 फिक्स 1: स्ट्रिंग सेफ़्टी भाई
-            price: priceNum,
-            originalPrice: originalPriceNum,
-            stock: stockNum || 0
+            quantityValue: String(v.quantityValue && v.quantityValue.trim() !== "" ? v.quantityValue : "1"),
+            unit: String(v.unit && v.unit.trim() !== "" ? v.unit.toLowerCase() : "piece"),
+            originalPrice: String(originalPriceNum), 
+            discountType: 'percentage',
+            discountValue: originalPriceNum > priceNum ? String(Math.round(((originalPriceNum - priceNum) / originalPriceNum) * 100)) : "0",
+            price: String(priceNum),
+            stock: String(stockNum || 0),
+            minOrderQty: "1",
+            maxOrderQty: "100"
           };
         });
 
-        const finalManualData = {
-          name: manualData.name,
-          description: manualData.description || "",
-          categoryId: Number(manualData.categoryId),
-          image: manualData.image,
-          isActive: true,
-          approvalStatus: 'approved',
-          variants: cleanedManualVariants // 🎯 मैनुअल की भी पूरी लिस्ट बैकएंड पर लॉक भाई!
-        };
+        // 🎯 पहले वैरिएंट की कीमत और स्टॉक को बेस मान लेते हैं ताकि मेन वैलिडेशन पास हो भाई!
+        const baseManualPrice = cleanedManualVariants[0]?.price || "0";
+        const baseManualStock = cleanedManualVariants[0]?.stock || "0";
 
-        console.log("🚀 Manual Single Payload:", JSON.stringify(finalManualData, null, 2));
-        await api.post('/api/products', finalManualData);
+        // 2. मल्टिपार्ट फॉर्म डेटा की रचना भाई साहब
+        const formData = new FormData();
+        formData.append('name', manualData.name.trim());
+        
+        const safeDescription = manualData.description && manualData.description.trim().length >= 3
+          ? manualData.description.trim() 
+          : `${manualData.name.trim()} - Premium Quality Fresh Product`;
+        formData.append('description', safeDescription);
+        formData.append('categoryId', String(manualData.categoryId));
+        formData.append('brand', "Generic");
+        formData.append('estimatedDeliveryTime', "1-2 hours");
+
+        // 🔥 कड़क फिक्स: मुख्य प्राइस और स्टॉक को भी मल्टिपार्ट के मुख्य लेवल पर इंजेक्ट कर दिया भाई साहब!
+        formData.append('price', baseManualPrice);
+        formData.append('stock', baseManualStock);
+
+        // ऑफिशियल मल्टिपार्ट एरे स्ट्रक्चर भाई साहब
+        cleanedManualVariants.forEach((v: any, index: number) => {
+          formData.append(`variants[${index}][quantityValue]`, v.quantityValue);
+          formData.append(`variants[${index}][unit]`, v.unit);
+          formData.append(`variants[${index}][originalPrice]`, v.originalPrice);
+          formData.append(`variants[${index}][discountType]`, v.discountType);
+          formData.append(`variants[${index}][discountValue]`, v.discountValue);
+          formData.append(`variants[${index}][price]`, v.price);
+          formData.append(`variants[${index}][stock]`, v.stock);
+          formData.append(`variants[${index}][minOrderQty]`, v.minOrderQty);
+          formData.append(`variants[${index}][maxOrderQty]`, v.maxOrderQty);
+        });
+
+        // 3. मुल्टर मेमोरी बफ़र बाईपास इमेज
+        const imagePath = manualData.image;
+        const fixedFileName = `manual_upload_${Date.now()}.jpg`;
+
+        formData.append('image', {
+          uri: Platform.OS === 'android' ? imagePath : imagePath.replace('file://', ''),
+          type: 'image/jpeg',
+          name: fixedFileName,
+        } as any);
+
+        console.log("🚀 [Multipart Final Sync Locked]: Launching to Backend Route...");
+
+        // 4. सीधे आपके बैकएंड राउट पर मल्टिपार्ट चैनल से हिट मारें भाई!
+        await api.post('/api/sellers/products', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
       }
-
       Alert.alert(
         "Success 🎉", 
-        mode === 'catalog' ? "Inventory Update Ho Gayi!" : "Product Live Ho Gaya!",
+        mode === 'catalog' ? "Inventory Update Ho Gayi!" : "Product Live Ho Gaya भाई!",
         [{ text: "Theek Hai", onPress: () => navigation.goBack() }]
       );
 
     } catch (err: any) {
       console.error("Submit Error:", err);
-      const errorMessage = err.response?.data?.message || err.message || "Submit fail ho gaya.";
+      const errorMessage = err.response?.data?.error || err.response?.data?.message || err.message || "Submit fail ho gaya.";
       Alert.alert("Error", errorMessage);
     } finally {
       setLoading(false);
