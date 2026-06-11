@@ -115,51 +115,80 @@ const [radius, setRadius] = useState(''); // Radius store karne ke liye
     setDeliveryPincodes(deliveryPincodes.filter(item => item !== code));
   };
 
-  // 3. Save Handler
+ // 3. Save Handler (🎯 बिना जबरदस्ती के डायनामिक स्टेटस और कैमलकेस फिक्स भाई साहब)
   const handleSave = async () => {
-  setLoading(true);
- try {
-    const payload = {
-      ...shopInfo,
-      deliveryPincodes: deliveryPincodes, 
-      isDistanceBasedDelivery: isDistanceBased, // 🚩 Sahi Mapping
-      deliveryRadius: isDistanceBased ? Number(radius) : null,
-      isAutoAccept,
-    };
+    console.log("FULL USER =", JSON.stringify(user, null, 2));
+    // सबसे पहले टोकन/यूजर स्टेट से असली आईडी निकालकर वैरिएबल बनाया भाई
+    const currentSellerId = user?.sellerId || user?.id;
 
-    // 🚩 AB ID BHEJNE KI ZAROORAT NAHI!
-    // /api/sellers/35 ki jagah ye likhein:
-    await api.patch(`/api/sellers/profile/me`, payload);
-    
-    Alert.alert("Success ✅", "Shop details updated successfully!", [
-      { text: "Congratulation!", onPress: () => navigation.goBack() }
-    ]);
-  } catch (error: any) {
-      if (error.response?.data?.errors) {
-      const serverErrors = error.response.data.errors;
-      
-      // Agar description mein error hai
-      if (serverErrors.description) {
-        Alert.alert("Dhyan Dein ⚠️", `Description: ${serverErrors.description[0]}`);
-      } 
-      // Agar pincode mein error hai
-      else if (serverErrors.pincode) {
-        Alert.alert("Dhyan Dein ⚠️", "Pincode sahi format mein nahi hai.");
-      }
-      else {
-        Alert.alert("Validation Error", "Kripya saari details sahi se bharein.");
-      }
-    } else {
-      // General error agar server hi down ho
-      Alert.alert("Error", error.response?.data?.message || "Update fail ho gaya.");
+    if (!currentSellerId) {
+      Alert.alert("Error ⚠️", "Authentication Error: Id missing on frontend भाई साहब।");
+      return;
     }
-  } finally {
-    setLoading(false);
-  }
-};
+
+    setLoading(true);
+    try {
+      const isDistance = Boolean(isDistanceBased);
+      const radiusNum = Number(radius || 0);
+
+      // 🚀 जादुई चाबी: जो स्टेटस यूजर का अभी ऐप में लाइव है, वही उठाओ भाई साहब!
+      const currentIsOpenStatus = user?.is_open || user?.isOpen || false;
+
+      // आपके बैकएंड के 'sellerUpdateSchema' वैलिडेटर की डिमांड के अनुसार सटीक पेलोड
+      const payload = {
+        businessName: shopInfo.businessName?.trim(),
+        description: shopInfo.description?.trim(),
+        businessAddress: shopInfo.businessAddress?.trim(),
+        pincode: shopInfo.pincode?.trim(),
+        openTime: shopInfo.openTime,
+        closeTime: shopInfo.closeTime,
+        isAutoAccept: isAutoAccept,
+        
+        // ✅ बिल्कुल परफेक्ट: कोई जबरदस्ती नहीं, करंट स्टेटस ही जाएगा भाई
+        isOpen: currentIsOpenStatus, 
+
+        // 🚀 कैमलकेस फिक्स: बैकएंड वैलिडेटर स्कीमा के हुबहू नाम ताकि डेटाबेस में null न हो!
+        isDistanceBasedDelivery: isDistance,
+        deliveryRadius: isDistance ? radiusNum : null,
+        deliveryPincodes: isDistance ? [] : deliveryPincodes, // Pure string array []
+      };
+
+      console.log(`🚀 [PATCH Sync Hit]: Blasting data to: /api/sellers/profile/${currentSellerId}`);
+
+      // =====================================================================
+      // 🔥 मास्टरस्ट्रोक: रास्ता और चाबी अब बैकएंड राउट से 100% मैच हैं भाई!
+      // =====================================================================
+      await api.patch(`/api/sellers/profile/${currentSellerId}`, payload);
+
+      Alert.alert("Success ✅", "Shop details updated successfully!", [
+        { text: "Congratulation!", onPress: () => navigation.goBack() }
+      ]);
+    } catch (error: any) {
+      console.error("Save Error:", error);
+      if (error.response?.data?.errors) {
+        const serverErrors = error.response.data.errors;
+        
+        // Agar description mein error hai
+        if (serverErrors.description) {
+          Alert.alert("Dhyan Dein ⚠️", `Description: ${serverErrors.description[0]}`);
+        } 
+        // Agar pincode mein error hai
+        else if (serverErrors.pincode) {
+          Alert.alert("Dhyan Dein ⚠️", "Pincode sahi format mein nahi hai.");
+        }
+        else {
+          Alert.alert("Validation Error", "Kripya saari details sahi se bharein.");
+        }
+      } else {
+        // General error
+        Alert.alert("Error", error.response?.data?.message || "Update fail ho gaya.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // 4. Reusable Input Component
-  
   if (initialLoading) {
     return (
       <View style={styles.center}>
@@ -168,7 +197,6 @@ const [radius, setRadius] = useState(''); // Radius store karne ke liye
       </View>
     );
   }
-
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
