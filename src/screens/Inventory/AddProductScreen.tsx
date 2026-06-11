@@ -271,7 +271,9 @@ const [manualData, setManualData] = useState<any>({
             resizeMode="contain"
           />
           <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+            <Text style={styles.itemName} numberOfLines={2}>
+              {item.name}
+            </Text>
             <View style={styles.badgeRow}>
               <Text style={styles.itemBrand}>{item.brand || 'No Brand'}</Text>
               {item.unit && <Text style={styles.unitBadge}>{item.unit}</Text>}

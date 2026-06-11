@@ -11,7 +11,9 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  StatusBar
+  StatusBar,
+  Modal,
+  FlatList
 } from 'react-native';
 import Feather from 'react-native-vector-icons/Feather';
 import { 
@@ -21,7 +23,10 @@ import {
   Tag, 
   ChevronLeft, 
   Save, 
-  Info 
+  Phone,
+  Info, 
+  Utensils,
+  ShoppingBag
 } from 'lucide-react-native';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -56,6 +61,13 @@ const ShopDetailsScreen = ({ navigation }: any) => {
 // --- States Section mein ye add karein ---
 const [isDistanceBased, setIsDistanceBased] = useState(false); // Ye error solve karega
 const [radius, setRadius] = useState(''); // Radius store karne ke liye
+// --- States Section mein ye dono add karein bhai sahab ---
+const [businessPhone, setBusinessPhone] = useState('');
+// --- States Section mein purani list hata kar ye add karein bhai sahab ---
+const [isModalVisible, setIsModalVisible] = useState(false);
+const [categoriesList, setCategoriesList] = useState<any[]>([]); // 🚀 100% लाइव लिस्ट के लिए खाली एर्रे
+const [catLoading, setCatLoading] = useState(false); // कैटेगरी लोड होने का स्पिनर
+const [categoryId, setCategoryId] = useState<number | null>(null);
   const [shopInfo, setShopInfo] = useState({
     id:null,
     businessName: '',
@@ -65,7 +77,32 @@ const [radius, setRadius] = useState(''); // Radius store karne ke liye
     openTime: '09:00 AM',
     closeTime: '10:00 PM',
   });
-
+const fetchLiveCategories = async () => {
+  setCatLoading(true);
+  try {
+    // आपके बैकएंड का कैटेगरी लिस्ट निकालने का एंडपॉइंट (पक्का कर लें कि यही राउट हो भाई)
+    const res = await api.get('/api/categories'); 
+    
+    // अगर बैकएंड रिपॉन्स में { success: true, categories: [...] } भेजता है:
+    if (res.data && res.data.categories) {
+      setCategoriesList(res.data.categories);
+    } else if (Array.isArray(res.data)) {
+      // अगर बैकएंड सीधे एर्रे भेजता है:
+      setCategoriesList(res.data);
+    }
+    console.log(`🎉 [Live Async Sync]: Successfully loaded ${res.data.categories?.length || 0} categories from backend!`);
+  } catch (err) {
+    console.error("⚠️ Categories fetch failed from backend:", err);
+    // अगर सर्वर डाउन हो तो सेफ्टी के लिए पुराना फॉलबैक ढांचा रेडी रहेगा ताकि ऐप क्रैश न हो भाई साहब
+    setCategoriesList([
+      { id: 1, name: "Grocery & FMCG (किराना)" },
+      { id: 2, name: "Restaurant & Cafes (होटल/कैफ़े)" },
+      { id: 3, name: "Fruits & Vegetables (फल-सब्ज़ी)" }
+    ]);
+  } finally {
+    setCatLoading(false);
+  }
+};
   // 1. Load Data on Mount
   useEffect(() => {
   // ✅ Logs ke mutabiq data direct 'user' mein hai, 'sellerProfile' mein nahi
@@ -79,7 +116,19 @@ const [radius, setRadius] = useState(''); // Radius store karne ke liye
       openTime: user.open_time || '09:00 AM',
       closeTime: user.close_time || '10:00 PM',
     });
+let rawPhone = user.business_phone || user.businessPhone || user.phone || '';
 
+// अगर नंबर में +91 लगा है, तो आगे के ३ अक्षर (+91) काट दो
+if (rawPhone.startsWith('+91')) {
+  rawPhone = rawPhone.slice(3);
+} 
+// अगर सिर्फ 91 लगा है (१२ अंक का नंबर है), तो आगे के २ अक्षर (91) काट दो
+else if (rawPhone.length === 12 && rawPhone.startsWith('91')) {
+  rawPhone = rawPhone.slice(2);
+}
+
+setBusinessPhone(rawPhone.trim());
+    setCategoryId(user.category_id || user.categoryId || null);
     setIsDistanceBased(user.is_distance_based_delivery || user.isDistanceBasedDelivery || false);
     setRadius(user.delivery_radius ? String(user.delivery_radius) : String(user.deliveryRadius || ''));
     
@@ -90,6 +139,7 @@ const [radius, setRadius] = useState(''); // Radius store karne ke liye
     }
     
     setIsAutoAccept(user.is_auto_accept || user.isAutoAccept || false);
+    fetchLiveCategories();
     
     // 🚩 Sabse zaroori: Loading yahan false hogi
     setInitialLoading(false);
@@ -125,7 +175,19 @@ const [radius, setRadius] = useState(''); // Radius store karne ke liye
       Alert.alert("Error ⚠️", "Authentication Error: Id missing on frontend भाई साहब।");
       return;
     }
+let cleanedPhone = businessPhone.trim().replace(/\s+/g, ''); // स्पेस हटाओ
 
+if (cleanedPhone.startsWith('+91')) {
+  cleanedPhone = cleanedPhone.slice(3);
+} else if (cleanedPhone.length === 12 && cleanedPhone.startsWith('91')) {
+  cleanedPhone = cleanedPhone.slice(2);
+}
+
+// अब वैलिडेशन चेक बिल्कुल १० अंक पर कड़क काम करेगा!
+if (cleanedPhone.length !== 10 || isNaN(Number(cleanedPhone))) {
+  Alert.alert("Invalid Phone ⚠️", "Kripya 10-digit ka sahi mobile number dalein.");
+  return;
+}
     setLoading(true);
     try {
       const isDistance = Boolean(isDistanceBased);
@@ -146,7 +208,8 @@ const [radius, setRadius] = useState(''); // Radius store karne ke liye
         
         // ✅ बिल्कुल परफेक्ट: कोई जबरदस्ती नहीं, करंट स्टेटस ही जाएगा भाई
         isOpen: currentIsOpenStatus, 
-
+businessPhone: cleanedPhone, // असली फोन नंबर
+      categoryId: categoryId,
         // 🚀 कैमलकेस फिक्स: बैकएंड वैलिडेटर स्कीमा के हुबहू नाम ताकि डेटाबेस में null न हो!
         isDistanceBasedDelivery: isDistance,
         deliveryRadius: isDistance ? radiusNum : null,
@@ -223,6 +286,36 @@ const [radius, setRadius] = useState(''); // Radius store karne ke liye
               onChangeText={(txt: string) => setShopInfo({...shopInfo, businessName: txt})}
               placeholder="e.g. Royal Fresh Mart"
             />
+            {/* 🚀 कड़क फिक्स १: दुकान का लाइव फोन नंबर (जो stores टेबल में phone बनकर जाएगा) */}
+  <InputField 
+    label="SHOP PHONE NUMBER (MANDATORY)" 
+    icon={Phone} // पक्का कर लें कि Phone आइकॉन ऊपर lucide-react-native से इम्पोर्ट हो भाई
+    value={businessPhone}
+    onChangeText={setBusinessPhone}
+    placeholder="e.g. 98290XXXXX"
+    keyboardType="numeric"
+    maxLength={10}
+  />
+{/* 🚀 पुराने ३ बटनों को हटाकर यह शानदार लाइव ड्रापडाउन बटन लगाओ भाई साहब */}
+<View style={styles.inputContainer}>
+  <Text style={styles.label}>SHOP CATEGORY (दुकान की कैटेगरी)</Text>
+  <TouchableOpacity 
+    style={styles.dropdownButton} 
+    onPress={() => setIsModalVisible(true)} // इसे दबाते ही नीचे से लिस्ट खुलेगी
+  >
+    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <Store size={20} color="#001B3A" style={{ marginRight: 12 }} />
+      <Text style={styles.dropdownButtonText}>
+        {categoryId 
+          ? categoriesList.find(c => c.id === categoryId)?.name || "Category Selected"
+          : "👉 अपनी दुकान की कैटेगरी चुनें"}
+      </Text>
+    </View>
+    {/* chevron-down आइकॉन के लिए Feather इम्पोर्ट कर लेना या इसकी जगह ChevronDown यूज़ कर लेना भाई साहब */}
+    <ChevronLeft size={20} color="#64748b" style={{ transform: [{ rotate: '-90deg' }] }} /> 
+  </TouchableOpacity>
+</View>
+
             <InputField 
               label="SHOP DESCRIPTION" 
               icon={Info} 
@@ -358,6 +451,60 @@ const [radius, setRadius] = useState(''); // Radius store karne ke liye
           
           <View style={{ height: 60 }} />
         </ScrollView>
+        {/* 🎯 यहाँ आएगी आपकी FlatList जो पॉप-अप (Modal) के अंदर पूरी २५+ लाइव कैटेगरीज को स्क्रॉल कराएगी */}
+<Modal
+  visible={isModalVisible}
+  animationType="slide"
+  transparent={true}
+  onRequestClose={() => setIsModalVisible(false)}
+>
+  <View style={styles.modalOverlay}>
+    <View style={styles.modalContent}>
+      
+      {/* मॉडल का हेडर */}
+      <View style={styles.modalHeader}>
+        <Text style={styles.modalTitle}>सभी लाइव कैटेगरीज की लिस्ट</Text>
+        <TouchableOpacity onPress={() => setIsModalVisible(false)} style={styles.closeModalBtn}>
+          <Text style={{ color: '#ef4444', fontWeight: '900', fontSize: 16 }}>बंद करें</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* 🚀 अगर बैकएंड से लाइव लोड हो रहा है तो स्पिनर दिखेगा, नहीं तो लिस्ट */}
+      {catLoading ? (
+        <View style={{ padding: 40, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="small" color="#001B3A" />
+          <Text style={{ marginTop: 10, color: '#64748b', fontWeight: '600' }}>लाइव कैटेगरीज लोड हो रही हैं...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={categoriesList}
+          keyExtractor={(item) => item.id.toString()}
+          showsVerticalScrollIndicator={true}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={[
+                styles.categoryListItem,
+                categoryId === item.id && styles.selectedListItem
+              ]}
+              onPress={() => {
+                setCategoryId(item.id);   // लाला जी के टच करते ही असली ID सेट हो जाएगी भाई साहब
+                setIsModalVisible(false); // चुनते ही पॉप-अप बंद!
+              }}
+            >
+              <Text style={[
+                styles.categoryListItemText,
+                categoryId === item.id && styles.selectedListItemText
+              ]}>
+                {item.name} {/* 🎯 बैकएंड के कॉलम नाम के हिसाब से यहाँ item.name आ जाएगा */}
+              </Text>
+              {categoryId === item.id && <ChevronLeft size={18} color="#001B3A" style={{ transform: [{ rotate: '180deg' }] }} />}
+            </TouchableOpacity>
+          )}
+        />
+      )}
+    </View>
+  </View>
+</Modal>
       </View>
     </KeyboardAvoidingView>
   );
@@ -433,6 +580,77 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontStyle: 'italic',
     paddingHorizontal: 4,
+  },
+// 🎯 styles ऑब्जेक्ट के अंदर नीचे ये डिज़ाइन्स जोड़ दो भाई साहब (VS Code की एरर तुरंत उड़ जाएगी):
+
+  dropdownButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    paddingHorizontal: 18,
+    height: 58,
+    marginTop: 5,
+  },
+  dropdownButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 27, 58, 0.4)', // स्क्रीन धुंधली करने के लिए कड़क ओवरले भाई साहब
+    justifyContent: 'flex-end', // लिस्ट नीचे से खुलेगी
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingTop: 20,
+    paddingHorizontal: 20,
+    maxHeight: '65%', // २५ कैटेगरीज मस्त स्क्रॉल होंगी ६५% स्क्रीन पर
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1.5,
+    borderBottomColor: '#f1f5f9',
+    paddingBottom: 15,
+    marginBottom: 10,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '900',
+    color: '#001B3A',
+  },
+  closeModalBtn: {
+    padding: 5,
+  },
+  categoryListItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f8fafc',
+  },
+  selectedListItem: {
+    backgroundColor: '#eff6ff',
+    borderRadius: 12,
+  },
+  categoryListItemText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  selectedListItemText: {
+    color: '#001B3A',
+    fontWeight: '900',
   },
   settingCard: { 
     flexDirection: 'row', 
