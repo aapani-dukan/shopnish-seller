@@ -30,6 +30,8 @@ import {
 } from 'lucide-react-native';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { useFocusEffect } from '@react-navigation/native';
+import { useLocationStore } from '../../hooks/useLocationStore';
 const InputField = ({ label, icon: Icon, value, onChangeText, placeholder, multiline = false, keyboardType = 'default' }: any) => (
     <View style={styles.inputContainer}>
       <Text style={styles.label}>{label}</Text>
@@ -50,7 +52,8 @@ const InputField = ({ label, icon: Icon, value, onChangeText, placeholder, multi
   );
 
 const ShopDetailsScreen = ({ navigation }: any) => {
-  const { user } = useAuth();
+  const {user, refreshUserStatus } = useAuth();
+const [seller, setSeller] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
 
@@ -105,8 +108,47 @@ const fetchLiveCategories = async () => {
 };
   // 1. Load Data on Mount
   useEffect(() => {
-  // ✅ Logs ke mutabiq data direct 'user' mein hai, 'sellerProfile' mein nahi
+  loadSeller();
+}, []);
+
+const loadSeller = async () => {
+  try {
+    const res = await api.get('/api/sellers/me');
+
+    const data = res.data;
+
+    console.log("SELLER DATA =", data);
+
+    setSeller(data);
+
+    setShopInfo({
+      id: data.id,
+      businessName: data.businessName || '',
+      description: data.description || '',
+      businessAddress: data.businessAddress || '',
+      pincode: data.pincode || '',
+      openTime: data.openTime || '09:00 AM',
+      closeTime: data.closeTime || '10:00 PM',
+    });
+
+    setBusinessPhone(data.businessPhone || '');
+    setCategoryId(data.categoryId || null);
+    setDeliveryPincodes(data.deliveryPincodes || []);
+    setIsDistanceBased(data.isDistanceBasedDelivery || false);
+    setRadius(String(data.deliveryRadius || ''));
+
+  } catch (err) {
+    console.log("SELLER LOAD ERROR", err);
+  } finally {
+    setInitialLoading(false);
+  }
+};
+  useEffect(() => {
   if (user) {
+    console.log(
+      "SHOP DETAILS USER =",
+      JSON.stringify(user, null, 2)
+    );
     setShopInfo({
       id: user.id || null, 
       businessName: user.business_name || user.businessName || '',
@@ -145,7 +187,29 @@ setBusinessPhone(rawPhone.trim());
     setInitialLoading(false);
   }
 }, [user]);
+useFocusEffect(
+  React.useCallback(() => {
 
+    const location =
+      useLocationStore.getState().selectedLocation;
+
+    if (location) {
+
+      setShopInfo(prev => ({
+        ...prev,
+        businessAddress: location.address || '',
+        pincode: location.pincode || ''
+      }));
+
+      useLocationStore
+        .getState()
+        .setSelectedLocation(null);
+
+      console.log("📍 Map Address Updated:", location);
+    }
+
+  }, [])
+);
   // 2. Pincode Handlers
   const addPincode = () => {
     const code = pincodeInput.trim();
@@ -213,7 +277,7 @@ businessPhone: cleanedPhone, // असली फोन नंबर
         // 🚀 कैमलकेस फिक्स: बैकएंड वैलिडेटर स्कीमा के हुबहू नाम ताकि डेटाबेस में null न हो!
         isDistanceBasedDelivery: isDistance,
         deliveryRadius: isDistance ? radiusNum : null,
-        deliveryPincodes: isDistance ? [] : deliveryPincodes, // Pure string array []
+        deliveryPincodes: deliveryPincodes, // Pure string array []
       };
 
       console.log(`🚀 [PATCH Sync Hit]: Blasting data to: /api/sellers/profile/${currentSellerId}`);
@@ -222,6 +286,7 @@ businessPhone: cleanedPhone, // असली फोन नंबर
       // 🔥 मास्टरस्ट्रोक: रास्ता और चाबी अब बैकएंड राउट से 100% मैच हैं भाई!
       // =====================================================================
       await api.patch(`/api/sellers/profile/${currentSellerId}`, payload);
+      await refreshUserStatus();
 
       Alert.alert("Success ✅", "Shop details updated successfully!", [
         { text: "Congratulation!", onPress: () => navigation.goBack() }
@@ -329,7 +394,38 @@ businessPhone: cleanedPhone, // असली फोन नंबर
           {/* 2. LOCATION */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Location Details</Text>
-            <InputField 
+           
+            <TouchableOpacity
+  onPress={() => navigation.navigate('SellerMapPicker')}
+  style={{
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 12,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center'
+  }}
+>
+  <Feather
+    name="map-pin"
+    size={18}
+    color="#2563eb"
+    style={{ marginRight: 8 }}
+  />
+
+  <Text
+    style={{
+      color: '#2563eb',
+      fontWeight: '700'
+    }}
+  >
+    Select Address From Map
+  </Text>
+</TouchableOpacity>
+ <InputField 
               label="FULL ADDRESS" 
               icon={MapPin} 
               value={shopInfo.businessAddress}

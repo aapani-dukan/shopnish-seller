@@ -14,6 +14,8 @@ export default function EditProductScreen({ route, navigation }: any) {
   const [saving, setSaving] = useState(false);
   const [categories, setCategories] = useState([]);
   const [formData, setFormData] = useState<any>(null);
+  const [subCategories, setSubCategories] = useState<any[]>([]);
+  const [selectedSubCatId, setSelectedSubCatId] = useState('');
 const [initialPrice, setInitialPrice] = useState('');
 const [existingVariants, setExistingVariants] = useState<any[]>([]);
   const fetchData = useCallback(async () => {
@@ -78,6 +80,18 @@ if (productData?.variants) {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+  useEffect(() => {
+    const fetchSubCats = async () => {
+      if (!formData?.categoryId) return;
+      try {
+        const res = await api.get(`/api/categories/${formData.categoryId}/subcategories`);
+        setSubCategories(res.data || []);
+      } catch (err) {
+        console.log("Edit Screen Subcategory load error:", err);
+      }
+    };
+    fetchSubCats();
+  }, [formData?.categoryId]);
  // 🎯 फिक्स 2: नए वैरिएंट-अवेयर पैच एंडपॉइंट के हिसाब से पेलोड पैक करना भाई
 const handleUpdate = async () => {
   // ⛔ वैलिडेशन चेक: प्राइस और स्टॉक खाली नहीं होना चाहिए भाई
@@ -148,6 +162,7 @@ const handleUpdate = async () => {
       name: formData.name?.trim(),
       description: formData.description || '',
       categoryId: parseInt(String(formData.categoryId)),
+      subCategoryId: formData.subCategoryId ? parseInt(String(formData.subCategoryId)) : null,
       brand: formData.brand || null,
       estimatedDeliveryTime: formData.estimatedDeliveryTime || "1-2 hours",
       imageUrl: formData.image,
@@ -296,7 +311,33 @@ return (
           value={formData?.description}
           onChangeText={(v) => setFormData({...formData, description: v})}
         />
-
+{/* 🎛️ नया कड़क सुधार: एडिट फॉर्म के अंदर सब-कैटेगरीज का स्क्रॉल बार लाइव भाई साहब! */}
+        {formData?.categoryId && subCategories.length > 0 && (
+          <View style={{ marginVertical: 10, backgroundColor: '#f8fafc', padding: 12, borderRadius: 14, borderWidth: 1, borderColor: '#e2e8f0' }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 6 }}>
+              सब-श्रेणी बदलें / Select Subcategory (अनिवार्य):
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
+              {subCategories.map((sub: any) => {
+                const isSubSelected = String(formData?.subCategoryId) === String(sub.id);
+                return (
+                  <TouchableOpacity 
+                    key={sub.id} 
+                    style={[{
+                      paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, 
+                      backgroundColor: '#fff', borderWidth: 1, borderColor: '#cbd5e1', alignItems: 'center'
+                    }, isSubSelected && { backgroundColor: '#1e40af', borderColor: '#1e40af' }]}
+                    onPress={() => setFormData({ ...formData, subCategoryId: sub.id.toString() })}
+                  >
+                    <Text style={[{ fontSize: 12, fontWeight: '700', color: '#475569' }, isSubSelected && { color: '#ffffff' }]}>
+                      {sub.name} {sub.nameHindi ? `/ ${sub.nameHindi}` : ''}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
         {/* Status Toggle */}
         <View style={styles.statusBox}>
           <View style={{ flex: 1, paddingRight: 10 }}>

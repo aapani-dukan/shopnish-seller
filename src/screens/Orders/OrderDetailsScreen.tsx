@@ -177,25 +177,49 @@ console.log("====== 📦 SELLER ORDER DATA END ======");
       
       // फाइनल टेक्स्ट जो स्क्रीन पर छपेगा
       const finalVariantText = variantDisplay || unitFallback || '';
-      
+    // ==================== 🎯 100% बुलेटप्रूफ सब-कैटेगरी समर्थित आर्डर आइटम रेंडरर ====================
       return (
         <View key={index} style={styles.itemRow}>
+          {/* मात्रा बैज (e.g. 1x, 2x) */}
           <View style={styles.qtyBadge}>
             <Text style={styles.qtyText}>{item.quantity}x</Text>
           </View>
+          
           <View style={{ flex: 1 }}>
+            {/* प्रोडक्ट का मुख्य नाम */}
             <Text style={styles.productName}>{item.productName}</Text>
             
-            {/* 📝 अगर डेटाबेस से "100 g" मिल गया, तो सुंदर अक्षरों में छाप दो */}
-            {finalVariantText ? (
-              <Text style={[styles.unitText, { color: '#1e40af', fontWeight: '700', marginTop: 3 }]}>
-                वैरिएंट: {String(finalVariantText)}
-              </Text>
-            ) : null}
+            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 3 }}>
+              {/* 📝 वैरिएंट डिस्प्ले (100 g, 1 kg) */}
+              {finalVariantText ? (
+                <Text style={[styles.unitText, { color: '#1e40af', fontWeight: '700' }]}>
+                  वैरिएंट: {String(finalVariantText)}
+                </Text>
+              ) : null}
+
+              {/* 🎛️ नया कड़क सुधार: आर्डर बिल पैकिंग के समय सब-कैटेगरी का मखमली छोटा टैग प्रकट होगा भाई! */}
+              {item.subCategoryName || item.sub_category_name ? (
+                <View style={{ 
+                  backgroundColor: '#f0fdf4', 
+                  paddingHorizontal: 6, 
+                  paddingVertical: 1, 
+                  borderRadius: 4,
+                  borderWidth: 1,
+                  borderColor: '#bbf7d0'
+                }}>
+                  <Text style={{ fontSize: 9, fontWeight: '800', color: '#16a34a' }}>
+                    📁 {item.subCategoryName || item.sub_category_name}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
           </View>
+          
+          {/* आइटम की टोटल कीमत */}
           <Text style={styles.priceText}>₹{item.itemTotal}</Text>
         </View>
       );
+     
     })
   ) : (
     <Text style={{ textAlign: 'center', margin: 10 }}>No items found in this order.</Text>

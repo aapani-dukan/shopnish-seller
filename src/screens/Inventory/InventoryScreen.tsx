@@ -170,13 +170,41 @@ const renderProduct = ({ item }: any) => {
             </View>
           )}
         </View>
-        
+     {/* ==================== 🎯 100% बुलेटप्रूफ सब-कैटेगरी टैग समर्थित यूआई ब्लॉक ==================== */}
         <View style={[styles.info, { flex: 1, paddingRight: 8 }]}>
-          <Text style={[styles.name, { fontSize: 16, fontWeight: 'bold' }]} numberOfLines={1}>{item.name}</Text>
-          <Text style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+          {/* प्रोडक्ट का नाम */}
+          <Text style={[styles.name, { fontSize: 16, fontWeight: 'bold', color: '#1e293b' }]} numberOfLines={1}>
+            {item.name}
+          </Text>
+
+          {/* 🎛️ नया कड़क सुधार: नाम के ठीक नीचे मखमली सब-कैटेगरी बैज प्रकट होगा भाई साहब! */}
+          {item.subCategoryName ? (
+            <View style={{ 
+              alignSelf: 'flex-start', 
+              backgroundColor: '#e0e7ff', 
+              paddingHorizontal: 8, 
+              paddingVertical: 2, 
+              borderRadius: 6, 
+              marginTop: 4,
+              borderWidth: 1,
+              borderColor: '#c7d2fe'
+            }}>
+              <Text style={{ fontSize: 10, fontWeight: '800', color: '#4338ca' }}>
+                🏷️ {item.subCategoryName} {item.subCategoryNameHindi ? `/ ${item.subCategoryNameHindi}` : ''}
+              </Text>
+            </View>
+          ) : (
+            /* फॉलबैक: अगर किसी पुराने माल में सब-कैटेगरी न भरी हो */
+            <View style={{ alignSelf: 'flex-start', backgroundColor: '#f1f5f9', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginTop: 4 }}>
+              <Text style={{ fontSize: 10, fontWeight: '700', color: '#64748b' }}>📦 General Item</Text>
+            </View>
+          )}
+
+          <Text style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
             कुल वैरिएंट्स: {variantsList.length}
           </Text>
-          <View style={[styles.stockRow, { marginTop: 6 }]}>
+          
+          <View style={[styles.stockRow, { marginTop: 4 }]}>
              <View style={[styles.modernBadge, { borderColor: stockColor + '40', paddingHorizontal: 8, paddingVertical: 2 }]}>
                 <View style={[styles.dot, { backgroundColor: stockColor }]} />
                 <Text style={[styles.stockText, { fontSize: 12 }]}>
@@ -185,6 +213,7 @@ const renderProduct = ({ item }: any) => {
              </View>
           </View>
         </View>
+        {/* ======================================================================================== */}
 
         {/* डिलीट बटन को मुख्य लेवल पर रख दिया भाई */}
         <View style={{ justifyContent: 'center' }}>

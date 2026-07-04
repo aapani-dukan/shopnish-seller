@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   View, Text, StyleSheet, TouchableOpacity, 
-  ActivityIndicator, SafeAreaView, Dimensions 
+  ActivityIndicator, SafeAreaView, Dimensions,Alert 
 } from 'react-native';
 import Feather from 'react-native-vector-icons/Feather';
 import { useAuth } from '../../hooks/useAuth'; // आपका Custom Auth Hook
@@ -10,7 +10,8 @@ const { width } = Dimensions.get('window');
 
 export default function SellerStatusScreen({ navigation }: any) {
   const { user, isLoadingAuth, isAuthenticated } = useAuth();
-
+  console.log("USER DATA IS:", user);
+const { logout,refreshUserStatus } = useAuth();
   if (isLoadingAuth) {
     return (
       <View style={styles.center}>
@@ -29,7 +30,7 @@ export default function SellerStatusScreen({ navigation }: any) {
     action: () => {}
   };
 // 🎯 फिक्स: बैकएंड ऑथ पेलोड के साथ 100% सिंक! प्रोफाइल और पैरेंट दोनों पाथ का फॉलबैक लगा दिया भाई
-  const status = user?.approvalStatus || user?.seller?.approvalStatus || user?.sellerProfile?.approvalStatus;
+ const status = (user as any)?.sellerApprovalStatus || (user as any)?.sellerStatus;
   const role = user?.role;
   const rejectionReason = user?.rejectionReason || user?.seller?.rejectionReason || user?.sellerProfile?.rejectionReason;
 
@@ -49,7 +50,8 @@ export default function SellerStatusScreen({ navigation }: any) {
       icon: "check-circle",
       color: "#10b981",
       btnText: "Go to Dashboard",
-      action: () => navigation.replace('SellerTabStack') // Main Dashboard पर भेजें
+     action: () => {}
+      // Main Dashboard पर भेजें
     };
   } else if (role === "seller" && status === "pending") {
     config = {
@@ -102,10 +104,39 @@ export default function SellerStatusScreen({ navigation }: any) {
         )}
 
         {status === 'pending' && (
-          <TouchableOpacity style={styles.logoutBtn} onPress={() => {/* Logout Logic */}}>
+          <TouchableOpacity style={styles.logoutBtn} onPress={() => logout()}>
             <Text style={styles.logoutText}>Log Out</Text>
           </TouchableOpacity>
+          
         )}
+        <TouchableOpacity 
+  style={{ 
+    backgroundColor: '#D4AF37', 
+    paddingVertical: 15, 
+    paddingHorizontal: 30, 
+    borderRadius: 12, 
+    marginBottom: 15,
+    alignItems: 'center' 
+  }}
+  onPress={async () => {
+    // API को कॉल करके लेटेस्ट स्टेटस लाएं
+    const updatedUser = await refreshUserStatus();
+    const userStatus = (updatedUser as any)?.sellerApprovalStatus;
+    if (userStatus === 'approved') {
+   
+      Alert.alert("Success", "Aapka account approve ho gaya hai!");
+      // नेविगेटर को बतायें कि अब सीधे डैशबोर्ड पर जाना है
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'SellerMain' }], // या जो भी आपके Dashboard/Tabs का नाम है
+      });
+    } else {
+      Alert.alert("Abhi bhi Pending hai", "Admin ne abhi tak approve nahi kiya hai. Thodi der baad check karein.");
+    }
+  }}
+>
+  <Text style={{ color: '#001B3A', fontWeight: 'bold' }}>Status Check Karein</Text>
+</TouchableOpacity>
       </View>
     </SafeAreaView>
   );

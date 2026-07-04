@@ -1,14 +1,12 @@
 import axios from "axios";
 import { getAuth } from "@react-native-firebase/auth";
 
-const isDevelopment = __DEV__;
-
-const baseURL = isDevelopment
-  ? "http://66.116.235.235:5001"   // 👉 लैपटॉप पर टेस्ट करते समय अपने आप पोर्ट 5001 पकड़ेगा (Testing Branch DB)
-  : "https://api.shopnish.com";   // 👉 लाइव मार्केट / वेंडर्स के फोन में अपने आप डोमेन पर रहेगा (Main Prod DB)
+// Jab final production APK banani ho, tab bas is line ko comment karke niche wali uncomment kar dena.
+const baseURL = "http://66.116.235.235:5001"; // Testing IP (Force)
+// const baseURL = "https://api.shopnish.com"; // Production URL
 
 const api = axios.create({
-  baseURL: baseURL, // 🎯 अब यह डिब्बा पूरी तरह डायनेमिक हो गया भाई साहब!
+  baseURL: baseURL, 
   timeout: 15000, 
   headers: {
     "Content-Type": "application/json",

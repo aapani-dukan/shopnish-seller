@@ -22,6 +22,10 @@
     "android": {
       "package": "com.shopnish.seller",
       "googleServicesFile": "./google-services.json",
+      "permissions": [
+    "ACCESS_FINE_LOCATION",
+    "ACCESS_COARSE_LOCATION"
+  ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#001B3A"
@@ -30,17 +34,25 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-   "plugins": [
+  "plugins": [
   "expo-asset",
   "@react-native-firebase/app",
   "@react-native-firebase/auth",
+
+  [
+    "expo-location",
+    {
+      "locationWhenInUsePermission": "Allow Shopnish Seller to access your location so you can select your shop location."
+    }
+  ],
+
   [
     "expo-notifications",
     {
       "icon": "./assets/notification-icon.png",
       "color": "#001B3A",
       "sounds": [
-        "./assets/siren.mp3" 
+        "./assets/siren.mp3"
       ]
     }
   ]

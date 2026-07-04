@@ -5,18 +5,35 @@ import {
 } from 'react-native';
 import Feather from 'react-native-vector-icons/Feather';
 import SellerOnboarding from './SellerOnboarding';
-
+import { useNavigation } from '@react-navigation/native';
 export default function SellerApplyScreen() {
   // नोट: navigation prop हटा दी है क्योंकि AppNavigator खुद स्टेट हैंडल कर रहा है।
-  
+  const navigation = useNavigation<any>();
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#f8fafc" />
       
       {/* 1. Custom Minimal Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Shopnish Business</Text>
-      </View>
+     <View style={styles.header}>
+
+  <TouchableOpacity
+    onPress={() => navigation.goBack()}
+    style={styles.backBtn}
+  >
+    <Feather
+      name="arrow-left"
+      size={24}
+      color="#111"
+    />
+  </TouchableOpacity>
+
+  <Text style={styles.headerTitle}>
+    Shopnish Business
+  </Text>
+
+  <View style={{ width: 24 }} />
+
+</View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         
@@ -83,5 +100,11 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 20,
     marginLeft: 5
-  }
+  },
+  backBtn: {
+  width: 40,
+  height: 40,
+  justifyContent: 'center',
+  alignItems: 'center',
+}
 });

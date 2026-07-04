@@ -21,14 +21,7 @@ export const registerForPushNotificationsAsync = async (userId: number) => {
       projectId: 'cdd5f700-e77b-40d3-bd9b-e7e48f6b3725',
     })).data;
     
-    try {
-      await api.patch(`/api/sellers/update-fcm-token`, { 
-        userId, 
-        fcmToken: token 
-      });
-    } catch (err) {
-      console.error("Token Save Error:", err);
-    }
+   
   }
 
   if (Platform.OS === 'android') {

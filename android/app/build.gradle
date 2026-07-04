@@ -86,14 +86,33 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
+    // 🎯 यहाँ से नीचे का पूरा हिस्सा बदल दो भाई साहब:
+
     namespace 'com.shopnish.seller'
     defaultConfig {
-        applicationId 'com.shopnish.seller'
+        applicationId 'com.shopnish.seller' // यह आपका मुख्य बेस पैकेज नेम है भाई
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0.0"
     }
+
+    // 🚀 जादुई मास्टरस्ट्रोक: यह ब्लॉक २ अलग-अलग रिलीज़ दुनिया बनाएगा भाई साहब!
+    flavorDimensions "default"
+    productFlavors {
+        production {
+            dimension "default"
+            // लाइव दुकानदारों वाले असली ऐप के लिए (Package: com.shopnish.seller)
+            resValue "string", "app_name", "Shopnish Seller"
+        }
+        staging {
+            dimension "default"
+            // टेस्टिंग वाली रिलीज़ APK के लिए पैकेज अलग कर दिया! (Package: com.shopnish.seller.testing)
+            applicationIdSuffix ".testing" 
+            resValue "string", "app_name", "Shopnish Testing" // फोन में नाम अलग चमकेगा भाई!
+        }
+    }
+
     signingConfigs {
         debug {
             storeFile file('debug.keystore')
@@ -106,11 +125,9 @@ android {
         debug {
             signingConfig signingConfigs.debug
             applicationIdSuffix ".debug"
-resValue "string", "app_name", "Shopnish Seller Debug"
+            resValue "string", "app_name", "Shopnish Seller Debug"
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
             signingConfig signingConfigs.debug
             shrinkResources (findProperty('android.enableShrinkResourcesInReleaseBuilds')?.toBoolean() ?: false)
             minifyEnabled enableProguardInReleaseBuilds

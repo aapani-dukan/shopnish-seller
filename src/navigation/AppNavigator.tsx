@@ -25,6 +25,8 @@ import SellerWalletScreen from '../screens/SellerWalletScreen';
 import BankDetailsScreen from '../screens/Auth/BankDetailsScreen';
 import ShopDetailsScreen from '../screens/Profile/ShopDetailsScreen';
 import TaxInfoScreen from '../screens/Profile/TaxInfoScreen';
+import SellerMapPicker from "../screens/Profile/SellerMapPicker";
+import NotASellerScreen from '../screens/NotASellerScreen';
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
@@ -33,7 +35,7 @@ const Tab = createBottomTabNavigator();
   const { user, refreshUserStatus } = useAuth();
 
   // ✅ CONFIRMED: Logs ke mutabiq ye do fields check karni hain
-  const status = user?.seller_approval_status || user?.sellerApprovalStatus;
+  const status = user?.sellerApprovalStatus ||user?.sellerStatus ;
   // 🚩 Agar status pending hai, toh Dashboard nahi, Message dikhao
   if (status === 'pending') {
     return (
@@ -84,17 +86,21 @@ const Tab = createBottomTabNavigator();
 // --- MAIN NAVIGATOR ---
 export default function AppNavigator() {
   const { user, isAuthenticated, isLoadingAuth } = useAuth();
-
+console.log("SELLER STATUS =", user?.sellerStatus);
+  console.log("ROLE =", user?.role);
   // 1. Loading State
   if (isLoadingAuth) {
     return null; // Yahan Splash Screen loading indicator daal sakte hain
+    
   }
-const isApproved = user?.seller_approval_status === 'approved' || user?.sellerApprovalStatus === 'approved';
-  const isPending = user?.seller_approval_status === 'pending' || user?.sellerApprovalStatus === 'pending';
+const isApproved = user?.sellerStatus === "approved";
+
+const isPending = user?.sellerStatus === "pending";
+
+const isRejected = user?.sellerStatus === "rejected";
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        
         {!isAuthenticated ? (
           // 2. Auth Flow
           <Stack.Screen name="Auth" component={AuthScreen} />
@@ -102,7 +108,6 @@ const isApproved = user?.seller_approval_status === 'approved' || user?.sellerAp
           <>
           {/* 3. Naya Logical Flow based on Status */}
             {user?.role === 'seller' && isApproved ? (
-              // Case A: Approved Seller
               <>
                 <Stack.Screen name="SellerMain" component={SellerTabs} />
                 <Stack.Screen name="OrderDetails" component={OrderDetailsScreen} options={{ headerShown: true, title: 'Order Details' }} />
@@ -112,14 +117,37 @@ const isApproved = user?.seller_approval_status === 'approved' || user?.sellerAp
                 <Stack.Screen name="TaxInfo" component={TaxInfoScreen} />
                 <Stack.Screen name="ShopDetails" component={ShopDetailsScreen} options={{ headerShown: false }} />
                 <Stack.Screen name="EditProduct" component={EditProductScreen} options={{ headerShown: true, title: 'Edit Product' }} />
+                <Stack.Screen
+      name="SellerMapPicker"
+      component={SellerMapPicker}
+    />
               </>
             ) : user?.role === 'seller' && isPending ? (
-           // Case B: Review State
               <Stack.Screen name="SellerStatus" component={SellerStatusScreen} />
-            ) : (
-              // Case C: New/Rejected (Registration/Application Flow)
-              <Stack.Screen name="SellerApply" component={SellerApplyScreen} />
-            )}
+              ) : user?.role === "seller" && isRejected ? (
+
+   <Stack.Screen
+      name="SellerApply"
+      component={SellerApplyScreen}
+   />
+               ) : (
+  <>
+    <Stack.Screen
+      name="NotASeller"
+      component={NotASellerScreen}
+    />
+
+    <Stack.Screen
+      name="SellerApply"
+      component={SellerApplyScreen}
+    />
+
+    <Stack.Screen
+      name="SellerMapPicker"
+      component={SellerMapPicker}
+    />
+  </>
+)}
           </>
         )}
       </Stack.Navigator>

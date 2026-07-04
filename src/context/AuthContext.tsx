@@ -20,7 +20,11 @@ interface AuthContextType {
   logout: () => Promise<void>;
   refreshUserStatus: () => Promise<void>;
 }
-
+interface SellerUser {
+  id: string;
+  role: string;
+  sellerStatus: 'pending' | 'approved' | 'rejected';
+}
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -52,14 +56,22 @@ const syncUserWithBackend = async (firebaseUser: FirebaseAuthTypes.User) => {
 
       const res = await api.get('/api/users/me'); 
       const fullUserData = res.data?.user || res.data;
-      
+      console.log("USER FROM BACKEND =", fullUserData);
       if (fullUserData) {
-        // ✅ firebaseUser.toJSON() की जगह सीधे डेटा को मर्ज करें
-        setUser({
-          uid: firebaseUser.uid,
-          phoneNumber: firebaseUser.phoneNumber,
-          ...fullUserData           
-        });
+      const sellerStatus =
+  fullUserData.currentSellerStatus ??
+  fullUserData.sellerApprovalStatus ??
+  "pending";
+
+setUser({
+  uid: firebaseUser.uid,
+  phoneNumber: firebaseUser.phoneNumber,
+
+  ...fullUserData,
+
+  sellerStatus,
+});
+      
       } else {
         setUser({ uid: firebaseUser.uid, phoneNumber: firebaseUser.phoneNumber });
       }

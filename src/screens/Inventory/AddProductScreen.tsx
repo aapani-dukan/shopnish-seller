@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, Text, TextInput, TouchableOpacity, FlatList, 
-  StyleSheet, Image, ActivityIndicator, Alert, ScrollView, Dimensions, KeyboardAvoidingView,Platform
+  StyleSheet, Image, ActivityIndicator, Alert, ScrollView, Dimensions, KeyboardAvoidingView,Platform,Keyboard
 } from 'react-native';
 import Feather from 'react-native-vector-icons/Feather';
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -18,8 +18,10 @@ export default function AddProductScreen({ navigation }: any) {
   const [searchTerm, setSearchTerm] = useState('');
   const [categories, setCategories] = useState<any[]>([]);
   const [selectedCat, setSelectedCat] = useState('all');
+  const [subCategories, setSubCategories] = useState<any[]>([]);
+  const [selectedSubCat, setSelectedSubCat] = useState('all');
   const [masterProducts, setMasterProducts] = useState([]);
-  
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   // Selection States
   const [selectedItems, setSelectedItems] = useState<any>({});
   
@@ -43,25 +45,101 @@ const [manualData, setManualData] = useState<any>({
     };
     fetchCats();
   }, []);
+// 🎛️ नया फिक्स: मुख्य कैटेगरी बदलते ही उसकी सब-कैटेगरीज लाइव लोड करने का इंजन भाई साहब
+  useEffect(() => {
+  const fetchSubCats = async () => {
+    if (selectedCat === 'all') {
+      setSubCategories([]);
+      setSelectedSubCat('all');
+      return;
+    }
 
+    try {
+      const res = await api.get(
+        `/api/categories/${selectedCat}/subcategories`
+      );
+
+      // 👇 यहीं लगाना है
+      console.log(
+        "SUB CATEGORIES =",
+        JSON.stringify(res.data.subCategories, null, 2)
+      );
+
+      setSubCategories(res.data.subCategories || []);
+      setSelectedSubCat('all');
+
+    } catch (err) {
+      console.log("Subcategory load error", err);
+    }
+  };
+
+  fetchSubCats();
+}, [selectedCat]);
   // 2. Master Search with Debounce (Optimized)
+ // 2. Master Search with Debounce (अब सब-कैटेगरी फिल्टर के साथ १००% सिंक भाई साहब!)
+ useEffect(() => {
+  console.log(
+    "CURRENT SUB CATEGORY =",
+    selectedSubCat
+  );
+}, [selectedSubCat]);
+useEffect(() => {
+  const showSubscription = Keyboard.addListener(
+    'keyboardDidShow',
+    () => {
+      setKeyboardVisible(true);
+    }
+  );
+
+  const hideSubscription = Keyboard.addListener(
+    'keyboardDidHide',
+    () => {
+      setKeyboardVisible(false);
+    }
+  );
+
+  return () => {
+    showSubscription.remove();
+    hideSubscription.remove();
+  };
+}, []);
   useEffect(() => {
     const fetchMasterData = async () => {
+      console.log(
+  "MASTER SEARCH TRIGGERED",
+  "CAT =", selectedCat,
+  "SUBCAT =", selectedSubCat
+);
+
+let url = `/api/products/master-search?q=${searchTerm}`;
+
+if (selectedCat !== "all") {
+  url += `&categoryId=${selectedCat}`;
+}
+
+if (selectedSubCat !== "all") {
+  url += `&subCategoryId=${selectedSubCat}`;
+}
+
+console.log("MASTER SEARCH URL =", url);
       if (mode !== 'catalog') return;
-      if (!selectedCat && searchTerm.length < 2) {
+      if (selectedCat === 'all' && searchTerm.length < 2) {
         setMasterProducts([]);
         return;
       }
       try {
         let url = `/api/products/master-search?q=${searchTerm}`;
         if (selectedCat !== "all") url += `&categoryId=${selectedCat}`;
+        // 🎯 जादुई लाइन: अगर दुकानदार ने सब-कैटेगरी चुनी है, तो बैकएंड को उसकी आईडी भी भेजो भाई!
+        if (selectedSubCat !== "all") url += `&subCategoryId=${selectedSubCat}`;
+        
         const res = await api.get(url);
-        setMasterProducts(res.data);
+        setMasterProducts(res.data || []);
       } catch (err) { console.log("Search failed", err); }
     };
     const timer = setTimeout(fetchMasterData, 400);
     return () => clearTimeout(timer);
-  }, [selectedCat, searchTerm, mode]);
+  }, [selectedCat, selectedSubCat, searchTerm, mode]); // 👈 निर्भरता में selectedSubCat जोड़ दिया भाई!
 
   // 3. Catalog Selection Toggle (वैरिएंट-अवेयर मोड भाई)
   const toggleItem = (item: any) => {
@@ -157,6 +235,7 @@ const [manualData, setManualData] = useState<any>({
         if (!manualData.name || manualData.name.length < 3) throw new Error("Naam chota hai.");
         if (!manualData.image) throw new Error("Kripya photo select karein.");
         if (!manualData.categoryId) throw new Error("Category chunna zaroori hai.");
+
         if (!manualData.variants || manualData.variants.length === 0) {
           throw new Error("Kam se kam ek variant add karna zaroori hai.");
         }
@@ -200,6 +279,9 @@ const [manualData, setManualData] = useState<any>({
           : `${manualData.name.trim()} - Premium Quality Fresh Product`;
         formData.append('description', safeDescription);
         formData.append('categoryId', String(manualData.categoryId));
+        if (manualData.subCategoryId) {
+  formData.append('subCategoryId', manualData.subCategoryId);
+}
         formData.append('brand', "Generic");
         formData.append('estimatedDeliveryTime', "1-2 hours");
 
@@ -322,6 +404,7 @@ const [manualData, setManualData] = useState<any>({
               };
 
               return (
+                
                 <View key={vIndex} style={{ backgroundColor: '#ffffff', padding: 12, borderRadius: 12, marginBottom: 10, borderWidth: 1, borderColor: '#e2e8f0', elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 }}>
                   
                   {/* 🔥 लाइन 1: मात्रा और यूनिट (आधा-आधा स्क्रीन स्पेस भाई) */}
@@ -401,7 +484,12 @@ const [manualData, setManualData] = useState<any>({
       </View> 
     );
   };
-  return (
+   return (
+  <KeyboardAvoidingView
+    style={{ flex: 1 }}
+    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+  >
+
     <View style={styles.container}>
       {/* Header Tabs */}
       <View style={styles.headerTabs}>
@@ -422,7 +510,10 @@ const [manualData, setManualData] = useState<any>({
       {mode === 'catalog' ? (
         <View style={{ flex: 1 }}>
           {/* Catalog Filters */}
+         {/* ==================== 🎯 100% बुलेटप्रूफ सब-कैटेगरी समर्थित फिल्टर सेक्शन ==================== */}
+         {!keyboardVisible && (
           <View style={styles.filterSection}>
+            {/* सर्च इनपुट */}
             <View style={styles.searchBar}>
               <Feather name="search" size={18} color="#94a3b8" />
               <TextInput 
@@ -433,26 +524,76 @@ const [manualData, setManualData] = useState<any>({
               />
             </View>
             
+            {/* 1. मुख्य कैटेगरी स्क्रोलर पट्टी (Main Categories) */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScroll}>
               <TouchableOpacity 
-                style={[styles.catPill, selectedCat === 'all' && styles.activeCatPill]}
+                style={[styles.catPill, selectedCat === 'all' && styles.activeTab]}
                 onPress={() => setSelectedCat('all')}
               >
-                <Text style={[styles.catPillText, selectedCat === 'all' && styles.activeCatPillText]}>All</Text>
+                <Text style={[styles.catPillText, selectedCat === 'all' && styles.activeTabText]}>All Categories</Text>
               </TouchableOpacity>
-              {categories.map((c: any) => (
-                <TouchableOpacity 
-                  key={c.id} 
-                  style={[styles.catPill, selectedCat === c.id.toString() && styles.activeCatPill]}
+             {categories.map((c: any, index: number) => (
+  <TouchableOpacity
+    key={`cat-${c.id}-${index}`}
+                  style={[styles.catPill, selectedCat === c.id.toString() && styles.activeTab]}
                   onPress={() => setSelectedCat(c.id.toString())}
                 >
-                  <Text style={[styles.catPillText, selectedCat === c.id.toString() && styles.activeCatPillText]}>{c.name}</Text>
+                  <Text style={[styles.catPillText, selectedCat === c.id.toString() && styles.activeTabText]}>{c.name}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
-          </View>
 
-          <FlatList 
+            {/* 🎛️ नया कड़क सुधार: जब मुख्य कैटेगरी चुनी हो, तब उसकी सब-कैटेगरीज गोल-गोल सुंदर Pills में नीचे चमकेंगी! */}
+          {selectedCat !== 'all' &&
+ subCategories.length > 0 &&
+ Object.keys(selectedItems).length === 0 && (
+  <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#f1f5f9' }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748b', marginLeft: 4, marginBottom: 4 }}>
+                  Subcategory Filter / उप-श्रेणी चुनें:
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 2, gap: 8 }}>
+                  <TouchableOpacity 
+                    style={[{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: '#f1f5f9', borderWidth: 1, borderColor: '#e2e8f0' }, selectedSubCat === 'all' && { backgroundColor: '#4338ca', borderColor: '#4338ca' }]}
+                    onPress={() => setSelectedSubCat('all')}
+                  >
+                    <Text style={[{ fontSize: 12, fontWeight: '600', color: '#475569' }, selectedSubCat === 'all' && { color: '#ffffff' }]}>
+                      📁 All Items / सब कुछ
+                    </Text>
+                  </TouchableOpacity>
+
+                 {subCategories.map((sub: any, index: number) => {
+  const isSubSelected = selectedSubCat === sub.id.toString();
+
+  return (
+    <TouchableOpacity
+      key={`sub-${sub.id}-${index}`}
+                        style={[{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: '#f1f5f9', borderWidth: 1, borderColor: '#e2e8f0', alignItems: 'center' }, isSubSelected && { backgroundColor: '#4338ca', borderColor: '#4338ca' }]}
+                       onPress={() => {
+  console.log(
+    "SUB CATEGORY CLICKED =",
+    sub.id,
+    sub.name
+  );
+
+  setSelectedSubCat(sub.id.toString());
+}}
+                      >
+                        <Text style={[{ fontSize: 12, fontWeight: '700', color: '#475569' }, isSubSelected && { color: '#ffffff' }]}>
+                          {sub.name} {sub.nameHindi ? `/ ${sub.nameHindi}` : ''}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
+          </View>
+         
+      )}
+          {/* ======================================================================================== */}
+          <FlatList
+           keyboardShouldPersistTaps="handled"
+         keyboardDismissMode="on-drag"
             data={masterProducts}
             keyExtractor={(item: any) => item.id.toString()}
             renderItem={renderMasterItem}
@@ -576,13 +717,23 @@ const [manualData, setManualData] = useState<any>({
             })}
           </View>
 
-          <Text style={styles.fieldLabel}>CATEGORY</Text>
+       {/* ==================== 🎯 100% बुलेटप्रूफ मैनुअल फॉर्म सब-कैटेगरी चेन इंजन ==================== */}
+          <Text style={styles.fieldLabel}>CATEGORY / मुख्य श्रेणी</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScrollManual}>
             {categories.map((c: any) => (
               <TouchableOpacity 
                 key={c.id} 
                 style={[styles.catPill, manualData.categoryId === c.id.toString() && styles.activeCatPill]}
-                onPress={() => setManualData({...manualData, categoryId: c.id.toString()})}
+                onPress={() => {
+                  // जादुई फिक्स: मुख्य कैटेगरी बदलते ही मैनुअल डेटा में categoryId सेट करें और पुरानी सब-कैटेगरी साफ़ करें भाई!
+                  setManualData({
+                    ...manualData,
+                    categoryId: c.id.toString(),
+                    subCategoryId: '' // मुख्य श्रेणी बदलते ही उप-श्रेणी रीसेट
+                  });
+                  // पार्ट 1 के इंजन को सूचित करें कि सब-कैटेगरीज लोड करनी है
+                  setSelectedCat(c.id.toString());
+                }}
               >
                 <Text style={[styles.catPillText, manualData.categoryId === c.id.toString() && styles.activeCatPillText]}>
                   {c.name}
@@ -590,10 +741,31 @@ const [manualData, setManualData] = useState<any>({
               </TouchableOpacity>
             ))}
           </ScrollView>
-        </ScrollView>
+
+          {/* 🎛️ नया कड़क सुधार: जब मैनुअल मोड में मुख्य कैटेगरी चुनी हो, तब उसकी सब-कैटेगरीज नीचे प्रकट होंगी! */}
+          {manualData.categoryId && manualData.categoryId !== '' && subCategories.length > 0 && (
+            <View style={{ marginTop: 5, marginBottom: 20 }}>
+              <Text style={styles.fieldLabel}>SUBCATEGORY / उप-श्रेणी चुनें (अनिवार्य)</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScrollManual}>
+                {subCategories.map((sub: any) => (
+                  <TouchableOpacity 
+                    key={sub.id} 
+                    style={[styles.catPill, manualData.subCategoryId === sub.id.toString() && { backgroundColor: '#4338ca', borderColor: '#4338ca' }]}
+                    onPress={() => setManualData({ ...manualData, subCategoryId: sub.id.toString() })}
+                  >
+                    <Text style={[styles.catPillText, manualData.subCategoryId === sub.id.toString() && { color: '#FFF' }]}>
+                      {sub.name} {sub.nameHindi ? `/ ${sub.nameHindi}` : ''}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+          {/* ======================================================================================== */}
+        </ScrollView> 
       )}
 
-      {/* Floating Action Button */}
+      {/* Floating Action Button (यह मुख्य पैरेंट View के अंदर रहेगा भाई साहब) */}
       <View style={styles.footer}>
         <TouchableOpacity 
           style={[styles.mainBtn, (mode === 'catalog' && Object.keys(selectedItems).length === 0) && { opacity: 0.5 }]} 
@@ -612,6 +784,7 @@ const [manualData, setManualData] = useState<any>({
         </TouchableOpacity>
       </View>
     </View>
+    </KeyboardAvoidingView>
   );
 }
 const styles = StyleSheet.create({
