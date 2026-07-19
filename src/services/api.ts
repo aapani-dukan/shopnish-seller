@@ -2,8 +2,8 @@ import axios from "axios";
 import { getAuth } from "@react-native-firebase/auth";
 
 // Jab final production APK banani ho, tab bas is line ko comment karke niche wali uncomment kar dena.
-const baseURL = "http://66.116.235.235:5001"; // Testing IP (Force)
-// const baseURL = "https://api.shopnish.com"; // Production URL
+//const baseURL = "http://66.116.235.235:5001"; // Testing IP (Force)
+const baseURL = "https://api.shopnish.com"; // Production URL
 
 const api = axios.create({
   baseURL: baseURL, 

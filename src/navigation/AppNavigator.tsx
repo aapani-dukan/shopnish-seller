@@ -27,6 +27,8 @@ import ShopDetailsScreen from '../screens/Profile/ShopDetailsScreen';
 import TaxInfoScreen from '../screens/Profile/TaxInfoScreen';
 import SellerMapPicker from "../screens/Profile/SellerMapPicker";
 import NotASellerScreen from '../screens/NotASellerScreen';
+import ReturnRequestsScreen from "../screens/ReturnRequestsScreen";
+import ReturnDetailsScreen from "../screens/ReturnDetailsScreen";
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
@@ -64,6 +66,7 @@ const Tab = createBottomTabNavigator();
           let iconName: string = 'circle';
           if (route.name === 'Dashboard') iconName = 'grid';
           else if (route.name === 'Orders') iconName = 'shopping-bag';
+          else if (route.name === 'Returns') iconName = 'rotate-ccw';
           else if (route.name === 'Inventory') iconName = 'box';
           else if (route.name === 'Profile') iconName = 'user';
           
@@ -77,6 +80,7 @@ const Tab = createBottomTabNavigator();
     >
       <Tab.Screen name="Dashboard" component={DashboardScreen} />
       <Tab.Screen name="Orders" component={OrdersScreen} />
+      <Tab.Screen name="Returns" component={ReturnRequestsScreen} />
       <Tab.Screen name="Inventory" component={InventoryScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
@@ -117,6 +121,14 @@ const isRejected = user?.sellerStatus === "rejected";
                 <Stack.Screen name="TaxInfo" component={TaxInfoScreen} />
                 <Stack.Screen name="ShopDetails" component={ShopDetailsScreen} options={{ headerShown: false }} />
                 <Stack.Screen name="EditProduct" component={EditProductScreen} options={{ headerShown: true, title: 'Edit Product' }} />
+                <Stack.Screen
+  name="ReturnDetails"
+  component={ReturnDetailsScreen}
+  options={{
+    headerShown: true,
+    title: "Return Details",
+  }}
+/>
                 <Stack.Screen
       name="SellerMapPicker"
       component={SellerMapPicker}
