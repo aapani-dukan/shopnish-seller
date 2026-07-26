@@ -202,18 +202,30 @@ onPress:()=>acceptMutation.mutate(item.id)
 
           )}
 
-          {item.status === "accepted" &&
-            item.returnType === "shop" && (
+         {item.status === "accepted" &&
+ item.returnType === "shop" && (
 
-            <View style={styles.waitBox}>
+<>
+  <TouchableOpacity
+    style={[
+      styles.button,
+      { backgroundColor: "#2563eb" },
+    ]}
+    onPress={() =>
+      navigation.navigate("ReturnDetails", {
+        returnId: item.id,
+        received: true,
+      })
+    }
+  >
+    <Text style={styles.buttonText}>
+      process Return
+    </Text>
+  </TouchableOpacity>
 
-              <Text>
-                Waiting for customer to submit product
-              </Text>
+</>
 
-            </View>
-
-          )}
+)}
 
           {item.status === "picked_up" && (
 

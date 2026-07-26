@@ -11,11 +11,12 @@ import {
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "../lib/queryClient"; // path अपने project के अनुसार ठीक कर लेना
+import { useState } from "react";
 
 export default function ReturnDetailsScreen({ route, navigation }: any) {
 
   const { returnId } = route.params;
-
+const [productReceived, setProductReceived] = useState(false);
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery<any>({
@@ -120,36 +121,66 @@ export default function ReturnDetailsScreen({ route, navigation }: any) {
         ₹{request.pickupFee}
       </Text>
 
-      <TouchableOpacity
-        style={styles.button}
-        disabled={completeMutation.isPending}
-        onPress={() => {
+      {!productReceived ? (
 
-          Alert.alert(
-            "Complete Return",
-            "Refund completed?",
-            [
-              {
-                text: "Cancel",
-                style: "cancel",
-              },
-              {
-                text: "Complete",
-                onPress: () =>
-                  completeMutation.mutate(),
-              },
-            ]
-          );
+  <TouchableOpacity
+    style={[
+      styles.button,
+      { backgroundColor: "#2563eb" }
+    ]}
+    onPress={() => {
+      Alert.alert(
+        "Receive Product",
+        "Confirm that you have received the returned product?",
+        [
+          {
+            text: "Cancel",
+            style: "cancel",
+          },
+          {
+            text: "Received",
+            onPress: () => setProductReceived(true),
+          },
+        ]
+      );
+    }}
+  >
+    <Text style={styles.buttonText}>
+      Product Received
+    </Text>
+  </TouchableOpacity>
 
-        }}
-      >
+) : (
 
-        <Text style={styles.buttonText}>
-          Complete Refund
-        </Text>
+  <TouchableOpacity
+    style={[
+      styles.button,
+      { backgroundColor: "#16a34a" }
+    ]}
+    disabled={completeMutation.isPending}
+    onPress={() => {
+      Alert.alert(
+        "Complete Refund",
+        "Refund completed?",
+        [
+          {
+            text: "Cancel",
+            style: "cancel",
+          },
+          {
+            text: "Complete",
+            onPress: () => completeMutation.mutate(),
+          },
+        ]
+      );
+    }}
+  >
+    <Text style={styles.buttonText}>
+      Complete Refund
+    </Text>
+  </TouchableOpacity>
 
-      </TouchableOpacity>
-
+)}
     </ScrollView>
 
   );
