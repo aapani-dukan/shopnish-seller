@@ -511,7 +511,7 @@ console.log("MASTER SEARCH URL =", url);
         <View style={{ flex: 1 }}>
           {/* Catalog Filters */}
          {/* ==================== 🎯 100% बुलेटप्रूफ सब-कैटेगरी समर्थित फिल्टर सेक्शन ==================== */}
-         {!keyboardVisible && (
+         
           <View style={styles.filterSection}>
             {/* सर्च इनपुट */}
             <View style={styles.searchBar}>
@@ -523,7 +523,8 @@ console.log("MASTER SEARCH URL =", url);
                 onChangeText={setSearchTerm}
               />
             </View>
-            
+            {!keyboardVisible &&(
+              <>
             {/* 1. मुख्य कैटेगरी स्क्रोलर पट्टी (Main Categories) */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScroll}>
               <TouchableOpacity 
@@ -542,7 +543,7 @@ console.log("MASTER SEARCH URL =", url);
                 </TouchableOpacity>
               ))}
             </ScrollView>
-
+            
             {/* 🎛️ नया कड़क सुधार: जब मुख्य कैटेगरी चुनी हो, तब उसकी सब-कैटेगरीज गोल-गोल सुंदर Pills में नीचे चमकेंगी! */}
           {selectedCat !== 'all' &&
  subCategories.length > 0 &&
@@ -587,9 +588,11 @@ console.log("MASTER SEARCH URL =", url);
                 </ScrollView>
               </View>
             )}
+            </>
+            )}
           </View>
          
-      )}
+      
           {/* ======================================================================================== */}
           <FlatList
            keyboardShouldPersistTaps="handled"
