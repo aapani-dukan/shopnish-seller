@@ -10,7 +10,6 @@ const { width } = Dimensions.get('window');
 const SellerWallet = () => {
   const [walletData, setWalletData] = useState({
     balance: 0,
-    pendingAmount: 0,
     transactions: []
   });
   const [loading, setLoading] = useState(true);
@@ -26,7 +25,6 @@ const SellerWallet = () => {
       
       setWalletData({
         balance: response.data.balance || 0,
-        pendingAmount: response.data.pendingAmount || 0,
         transactions: response.data.transactions || []
       });
     } catch (error: any) {
@@ -64,14 +62,6 @@ const SellerWallet = () => {
           <View>
             <Text style={styles.cardLabel}>AVAILABLE BALANCE</Text>
             <Text style={styles.cardAmount}>₹{Number(walletData.balance).toLocaleString('en-IN')}</Text>
-            
-            {/* 🔥 Pending Amount Logic */}
-            <View style={styles.pendingContainer}>
-              <Clock color="#94a3b8" size={12} />
-              <Text style={styles.pendingText}>
-                Processing: ₹{Number(walletData.pendingAmount).toLocaleString('en-IN')}
-              </Text>
-            </View>
           </View>
           <View style={styles.iconContainer}>
             <Wallet color="white" size={28} strokeWidth={2} />
@@ -139,12 +129,24 @@ const SellerWallet = () => {
                     )}
                   </View>
                   <View style={{ marginLeft: 12, flex: 1 }}>
-                    <Text style={styles.txDesc} numberOfLines={1}>{displayDesc}</Text>
-                    <Text style={styles.txDate}>
-                      {tx.createdAt 
-                        ? new Date(tx.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) 
-                        : 'N/A'}
-                    </Text>
+                    <Text style={styles.txDesc} numberOfLines={3}>{displayDesc}</Text>
+                  <Text style={styles.txDate}>
+  {tx.date 
+    ? new Date(tx.date).toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      })
+    : 'N/A'}
+</Text>
+
+{tx.closingBalance !== undefined && (
+  <Text style={styles.txBalance}>
+    Balance: ₹{Number(tx.closingBalance).toLocaleString('en-IN', {
+      minimumFractionDigits: 2
+    })}
+  </Text>
+)}
                   </View>
                 </View>
                 <Text style={[styles.txAmount, { color: isCredit ? '#16a34a' : '#dc2626' }]}>
@@ -188,7 +190,12 @@ const styles = StyleSheet.create({
   txDesc: { color: '#1e293b', fontWeight: '700', fontSize: 14 },
   txDate: { color: '#94a3b8', fontSize: 10, fontWeight: '600', marginTop: 2 },
   txAmount: { fontSize: 16, fontWeight: '900' },
-  emptyState: { alignItems: 'center', padding: 40, backgroundColor: 'white', borderRadius: 20, borderStyle: 'dashed', borderWidth: 1, borderColor: '#cbd5e1' }
+  emptyState: { alignItems: 'center', padding: 40, backgroundColor: 'white', borderRadius: 20, borderStyle: 'dashed', borderWidth: 1, borderColor: '#cbd5e1' },
+  txBalance: {
+  fontSize: 11,
+  color: '#64748b',
+  marginTop: 2,
+},
 });
 
 export default SellerWallet;

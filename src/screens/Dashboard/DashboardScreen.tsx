@@ -77,7 +77,7 @@ const updateStatusMutation = useMutation({
 
   // Metrics Logic
   const metrics = [
-    { title: 'Today Sales', value: `₹${Number(dashboardData?.todaySales || 0).toLocaleString('en-IN')}`, icon: 'trending-up', color: '#10b981', bg: '#ecfdf5' },
+  /*  { title: 'Today Sales', value: `₹${Number(dashboardData?.todaySales || 0).toLocaleString('en-IN')}`, icon: 'trending-up', color: '#10b981', bg: '#ecfdf5' },*/
     { title: 'Pending Orders', value: dashboardData?.pendingOrders || 0, icon: 'clock', color: '#f59e0b', bg: '#fffbeb' },
     { 
       title: 'Low Stock', 
@@ -137,7 +137,7 @@ const updateStatusMutation = useMutation({
         {/* ✅ ADDED: Hero Card (Revenue display) */}
        {/* ✅ Fixed: 'div' ko 'View' mein badal diya hai */}
 <View style={styles.heroCard}>
-  <Text style={styles.heroLabel}>Total Revenue (Today)</Text>
+  <Text style={styles.heroLabel}>Total Sales (Today)</Text>
   <Text style={styles.heroValue}>₹{Number(dashboardData?.todaySales || 0).toLocaleString('en-IN')}</Text>
   <View style={styles.heroFooter}>
     <Feather name="arrow-up-right" size={16} color="#D4AF37" />

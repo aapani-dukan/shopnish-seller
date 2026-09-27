@@ -272,41 +272,79 @@ console.log("====== 📦 SELLER ORDER DATA END ======");
 </View>
 
       </ScrollView>
-
-      {/* Modern Fixed Action Footer */}
-      <View style={styles.footer}>
-        {order?.status === 'pending' && (
-          <View style={styles.footerRow}>
-             <TouchableOpacity style={styles.rejectBtn} onPress={() => updateStatus('rejected')}>
-                <Text style={styles.rejectBtnText}>Reject</Text>
-             </TouchableOpacity>
-             <TouchableOpacity style={styles.acceptBtn} onPress={() => updateStatus('accepted')}>
-                {updating ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Accept Order</Text>}
-             </TouchableOpacity>
-          </View>
+{/* Modern Fixed Action Footer */}
+<View style={styles.footer}>
+  {order?.status === 'pending' && (
+    <View style={styles.footerRow}>
+      <TouchableOpacity
+        style={styles.rejectBtn}
+        onPress={() => updateStatus('rejected')}
+        disabled={updating}
+      >
+        {updating ? (
+          <ActivityIndicator color="#fff" size="small" />
+        ) : (
+          <Text style={styles.rejectBtnText}>Reject</Text>
         )}
-        
-        {order?.status === 'accepted' && (
-  <TouchableOpacity style={styles.fullWidthBtn} onPress={() => updateStatus('preparing')}>
-    <Feather name="play" size={20} color="#fff" />
-    <Text style={styles.btnText}>Start Preparing</Text>
-  </TouchableOpacity>
-)}
+      </TouchableOpacity>
 
-{order?.status === 'preparing' && (
-  <TouchableOpacity style={styles.fullWidthBtn} onPress={() => updateStatus('ready_for_pickup')}>
-    <Feather name="package" size={20} color="#fff" />
-    <Text style={styles.btnText}>Mark as Ready for Pickup</Text>
-  </TouchableOpacity>
-)}
-        
-        {order?.status === 'ready_for_pickup' && (
-          <View style={styles.waitingBox}>
-             <ActivityIndicator color="#8b5cf6" size="small" />
-             <Text style={styles.waitingText}>Waiting for Delivery Partner to pick up...</Text>
-          </View>
+      <TouchableOpacity
+        style={styles.acceptBtn}
+        onPress={() => updateStatus('accepted')}
+        disabled={updating}
+      >
+        {updating ? (
+          <ActivityIndicator color="#fff" size="small" />
+        ) : (
+          <Text style={styles.btnText}>Accept Order</Text>
         )}
-      </View>
+      </TouchableOpacity>
+    </View>
+  )}
+
+  {order?.status === 'accepted' && (
+    <TouchableOpacity
+      style={styles.fullWidthBtn}
+      onPress={() => updateStatus('preparing')}
+      disabled={updating}
+    >
+      {updating ? (
+        <ActivityIndicator color="#fff" size="small" />
+      ) : (
+        <>
+          <Feather name="play" size={20} color="#fff" />
+          <Text style={styles.btnText}>Start Preparing</Text>
+        </>
+      )}
+    </TouchableOpacity>
+  )}
+
+  {order?.status === 'preparing' && (
+    <TouchableOpacity
+      style={styles.fullWidthBtn}
+      onPress={() => updateStatus('ready_for_pickup')}
+      disabled={updating}
+    >
+      {updating ? (
+        <ActivityIndicator color="#fff" size="small" />
+      ) : (
+        <>
+          <Feather name="package" size={20} color="#fff" />
+          <Text style={styles.btnText}>Mark as Ready for Pickup</Text>
+        </>
+      )}
+    </TouchableOpacity>
+  )}
+
+  {order?.status === 'ready_for_pickup' && (
+    <View style={styles.waitingBox}>
+      <ActivityIndicator color="#8b5cf6" size="small" />
+      <Text style={styles.waitingText}>
+        Waiting for Delivery Partner to pick up...
+      </Text>
+    </View>
+  )}
+</View>
     </View>
   );
 }
