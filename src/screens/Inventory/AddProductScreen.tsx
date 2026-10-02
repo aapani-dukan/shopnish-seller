@@ -28,9 +28,12 @@ export default function AddProductScreen({ navigation }: any) {
   // 🎯 फिक्स: <any> टाइप जोड़ दिया भाई ताकि टाइपस्क्रिप्ट 'variants' एरे को सेफ़ली एक्सेप्ट कर ले
 const [manualData, setManualData] = useState<any>({
   name: '',
+  nameHindi: '',
   description: '',
+  descriptionHindi: '',
   categoryId: '',
   image: null,
+  galleryImages: [],
   // 📦 डिफ़ॉल्ट रूप से पहला खाली वैरिएंट रो हमेशा तैयार रहेगा भाई
   variants: [{ quantityValue: '1', unit: 'piece', price: '', originalPrice: '', stock: '' }]
 });
@@ -273,15 +276,21 @@ console.log("MASTER SEARCH URL =", url);
         // 2. मल्टिपार्ट फॉर्म डेटा की रचना भाई साहब
         const formData = new FormData();
         formData.append('name', manualData.name.trim());
-        
-        const safeDescription = manualData.description && manualData.description.trim().length >= 3
-          ? manualData.description.trim() 
-          : `${manualData.name.trim()} - Premium Quality Fresh Product`;
-        formData.append('description', safeDescription);
+        formData.append('nameHindi', manualData.nameHindi && manualData.nameHindi.trim().length >= 3 ? manualData.nameHindi.trim() : manualData.name.trim());
+        formData.append('description', manualData.description && manualData.description.trim().length >= 3 ? manualData.description.trim() : `${manualData.name.trim()} - Premium Quality Fresh Product`);
+        formData.append('descriptionHindi', manualData.descriptionHindi && manualData.descriptionHindi.trim().length >= 3 ? manualData.descriptionHindi.trim() : `${manualData.name.trim()} - प्रीमियम क्वालिटी ताज़ा उत्पाद`);
         formData.append('categoryId', String(manualData.categoryId));
         if (manualData.subCategoryId) {
   formData.append('subCategoryId', manualData.subCategoryId);
 }
+// Gallery images multipart mein jodo
+manualData.galleryImages.forEach((uri: string, idx: number) => {
+  formData.append('images', {
+    uri: Platform.OS === 'android' ? uri : uri.replace('file://', ''),
+    type: 'image/jpeg',
+    name: `gallery_${idx}_${Date.now()}.jpg`,
+  } as any);
+});
         formData.append('brand', "Generic");
         formData.append('estimatedDeliveryTime', "1-2 hours");
 
@@ -624,12 +633,43 @@ console.log("MASTER SEARCH URL =", url);
               </View>
             )}
           </TouchableOpacity>
-
+         <Text style={styles.fieldLabel}>ADDITIONAL PHOTOS (वैकल्पिक, पर सलाह दी जाती है)</Text>
+<ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+  {manualData.galleryImages.map((uri: string, idx: number) => (
+    <View key={idx} style={{ marginRight: 8, position: 'relative' }}>
+      <Image source={{ uri }} style={{ width: 70, height: 70, borderRadius: 8 }} />
+      <TouchableOpacity
+        style={{ position: 'absolute', top: -4, right: -4, backgroundColor: '#ef4444', borderRadius: 10, width: 20, height: 20, alignItems: 'center', justifyContent: 'center' }}
+        onPress={() => {
+          const updated = manualData.galleryImages.filter((_: string, i: number) => i !== idx);
+          setManualData({ ...manualData, galleryImages: updated });
+        }}
+      >
+        <Text style={{ color: '#fff', fontSize: 11 }}>✕</Text>
+      </TouchableOpacity>
+    </View>
+  ))}
+  <TouchableOpacity
+    style={{ width: 70, height: 70, borderRadius: 8, borderWidth: 1, borderColor: '#cbd5e1', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' }}
+    onPress={async () => {
+      const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.8, selectionLimit: 5 });
+      if (result.assets) {
+        const uris = result.assets.map((a: any) => a.uri).filter(Boolean);
+        setManualData({ ...manualData, galleryImages: [...manualData.galleryImages, ...uris] });
+      }
+    }}
+  >
+    <Feather name="plus" size={24} color="#94a3b8" />
+  </TouchableOpacity>
+</ScrollView>
           <Text style={styles.fieldLabel}>PRODUCT NAME</Text>
           <TextInput style={styles.fullInput} placeholder="e.g. Fresh Organic Apples" value={manualData.name} onChangeText={(v) => setManualData({...manualData, name: v})} />
-          
+          <Text style={styles.fieldLabel}>PRODUCT NAME (हिंदी)</Text>
+<TextInput style={styles.fullInput} placeholder="जैसे: ताज़े जैविक सेब" value={manualData.nameHindi} onChangeText={(v) => setManualData({...manualData, nameHindi: v})} />
           <Text style={styles.fieldLabel}>DESCRIPTION</Text>
           <TextInput style={[styles.fullInput, { height: 80 }]} multiline placeholder="Tell buyers about this product..." value={manualData.description} onChangeText={(v) => setManualData({...manualData, description: v})} />
+          <Text style={styles.fieldLabel}>DESCRIPTION (हिंदी)</Text>
+          <TextInput style={[styles.fullInput, { height: 80 }]} multiline placeholder="इस उत्पाद के बारे में खरीदारों को बताएं..." value={manualData.descriptionHindi} onChangeText={(v) => setManualData({...manualData, descriptionHindi: v})} />
 
           {/* 🎯 जादुई बदलाव: मैनुअल फॉर्म के लिए कस्टमाइज्ड फुल-वैरिएंट ग्रिड बॉक्स भाई */}
           <View style={{ marginVertical: 10, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, backgroundColor: '#f8fafc' }}>
@@ -677,10 +717,10 @@ console.log("MASTER SEARCH URL =", url);
 
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
                     <View style={{ width: '48%' }}>
-                      <TextInput style={[styles.miniInput, {width: '100%'}]} keyboardType="numeric" placeholder="मात्रा (e.g. 1, 250)" value={variant.quantityValue} onChangeText={(v) => updateVariantField('quantityValue', v)} />
+                      <TextInput style={[styles.miniInput, {width: '100%'}]} key="quantity" placeholder="मात्रा (e.g. 1, 250)" value={variant.quantityValue} onChangeText={(v) => updateVariantField('quantityValue', v)} />
                     </View>
                     <View style={{ width: '48%' }}>
-                      <TextInput style={[styles.miniInput, {width: '100%'}]} placeholder="यूनिट (e.g. kg, gm)" autoCapitalize="none" value={variant.unit} onChangeText={(v) => updateVariantField('unit', v)} />
+                      <TextInput style={[styles.miniInput, {width: '100%'}]} key="unit" placeholder="यूनिट (e.g. kg, gm)" autoCapitalize="none" value={variant.unit} onChangeText={(v) => updateVariantField('unit', v)} />
                     </View>
                   </View>
 
